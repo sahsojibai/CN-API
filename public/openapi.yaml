@@ -1,0 +1,417 @@
+openapi: 3.1.0
+info:
+  title: Chattrn Commerce API
+  version: "2026-10"
+  summary: v1
+  description: >
+    A Shopify-compatible subset in plain REST/JSON: the same resource names, field names,
+    nesting and value formats as Shopify's Admin REST API (reference version 2026-10), plus a
+    few marked Chattrn extensions (x_chattrn, and the fields listed under "Additions" below).
+    A store builds this so Chattrn can read and act on its catalog, locations, customers and
+    orders. See devspec.txt / v1_full.txt for the full narrative spec this file is generated from.
+servers:
+  - url: "https://{merchant-host}/chattrn/api/2026-10"
+    variables:
+      merchant-host:
+        default: your-store.example.com
+security:
+  - accessToken: []
+components:
+  securitySchemes:
+    accessToken:
+      type: apiKey
+      in: header
+      name: X-Chattrn-Access-Token
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 250, default: 50 }
+    pageInfo:
+      name: page_info
+      in: query
+      schema: { type: string }
+    fields:
+      name: fields
+      in: query
+      schema: { type: string }
+      description: Comma-separated field list, e.g. fields=id,title.
+  schemas:
+    Money:
+      type: string
+      description: Decimal string with the currency's own number of decimals ("19990.00" BDT, "1500" JPY). Never a formatted string like "৳ 19,990".
+      pattern: "^\\d+(\\.\\d+)?$"
+    Errors:
+      oneOf:
+        - type: object
+          properties: { errors: { type: string } }
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties: { type: array, items: { type: string } }
+    Image:
+      type: object
+      required: [id, src]
+      properties:
+        id: { type: [integer, string] }
+        src: { type: string, format: uri, description: "Public HTTPS URL. Must load with a 200 and an image type." }
+        position: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        variant_ids: { type: array, items: { type: [integer, string] } }
+        alt: { type: string }
+    Variant:
+      type: object
+      required: [id, product_id, title, price]
+      properties:
+        id: { type: [integer, string] }
+        product_id: { type: [integer, string] }
+        title: { type: string, example: "Black / 256GB" }
+        option1: { type: [string, "null"] }
+        option2: { type: [string, "null"] }
+        option3: { type: [string, "null"] }
+        price: { $ref: "#/components/schemas/Money" }
+        compare_at_price: { oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }] }
+        sku: { type: [string, "null"] }
+        barcode: { type: [string, "null"] }
+        inventory_item_id: { type: [integer, string] }
+        inventory_quantity: { type: [integer, "null"] }
+        inventory_management: { type: [string, "null"], enum: ["shopify", null] }
+        inventory_policy: { type: string, enum: [deny, continue] }
+        weight: { type: number }
+        weight_unit: { type: string, enum: [g, kg, lb, oz] }
+        image_id: { type: [integer, string] }
+    Option:
+      type: object
+      properties:
+        id: { type: [integer, string] }
+        name: { type: string, example: Color }
+        position: { type: integer, minimum: 1, maximum: 3 }
+        values: { type: array, items: { type: string } }
+    Product:
+      type: object
+      required: [id, title, handle, status, created_at, updated_at, variants]
+      properties:
+        id: { type: [integer, string] }
+        title: { type: string, minLength: 1 }
+        handle: { type: string }
+        body_html: { type: string }
+        vendor: { type: string }
+        product_type: { type: string }
+        status: { type: string, enum: [active, draft, archived] }
+        tags: { type: string, description: Comma-separated. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        options: { type: array, items: { $ref: "#/components/schemas/Option" } }
+        variants: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Variant" } }
+        images: { type: array, items: { $ref: "#/components/schemas/Image" } }
+        x_chattrn: { type: object, additionalProperties: true }
+    Location:
+      type: object
+      required: [id, name, country_code, active]
+      properties:
+        id: { type: [integer, string] }
+        name: { type: string }
+        address1: { type: string }
+        city: { type: string }
+        zip: { type: string }
+        province: { type: string }
+        country_code: { type: string, pattern: "^[A-Z]{2}$" }
+        phone: { type: string }
+        active: { type: boolean }
+        x_chattrn:
+          type: object
+          properties:
+            type: { type: string, enum: [zone, outlet] }
+            areas: { type: array, items: { type: string } }
+            min_order: { $ref: "#/components/schemas/Money" }
+    InventoryLevel:
+      type: object
+      required: [inventory_item_id, location_id, available, updated_at]
+      properties:
+        inventory_item_id: { type: [integer, string] }
+        location_id: { type: [integer, string] }
+        available: { type: [integer, "null"] }
+        updated_at: { type: string, format: date-time }
+    Customer:
+      type: object
+      required: [id]
+      properties:
+        id: { type: [integer, string] }
+        phone: { type: string, pattern: "^\\+[1-9]\\d{6,14}$" }
+        email: { type: string, format: email }
+        first_name: { type: string }
+        last_name: { type: string }
+        orders_count: { type: integer }
+        total_spent: { $ref: "#/components/schemas/Money" }
+        default_address: { type: object }
+        created_at: { type: string, format: date-time }
+    Fulfillment:
+      type: object
+      properties:
+        id: { type: [integer, string] }
+        order_id: { type: [integer, string] }
+        status: { type: string, enum: [pending, open, success, cancelled, error, failure] }
+        tracking_company: { type: string }
+        tracking_number: { type: string }
+        tracking_url: { type: string, format: uri }
+        shipment_status:
+          type: string
+          enum: [label_printed, label_purchased, confirmed, in_transit, out_for_delivery, attempted_delivery, ready_for_pickup, delivered, failure]
+        created_at: { type: string, format: date-time }
+    Order:
+      type: object
+      required: [id, name, order_number, created_at, currency, total_price, financial_status, shipping_address, line_items]
+      properties:
+        id: { type: [integer, string] }
+        name: { type: string, example: "#1042" }
+        order_number: { type: integer }
+        phone: { type: string }
+        email: { type: string }
+        created_at: { type: string, format: date-time }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        subtotal_price: { $ref: "#/components/schemas/Money" }
+        total_discounts: { $ref: "#/components/schemas/Money" }
+        total_tax: { $ref: "#/components/schemas/Money" }
+        total_price: { $ref: "#/components/schemas/Money" }
+        financial_status: { type: string, enum: [pending, authorized, partially_paid, paid, partially_refunded, refunded, voided] }
+        fulfillment_status: { type: [string, "null"], enum: [null, partial, fulfilled, restocked] }
+        cancelled_at: { type: [string, "null"], format: date-time }
+        cancel_reason: { type: [string, "null"], enum: [customer, fraud, inventory, declined, other, null] }
+        payment_gateway_names: { type: array, items: { type: string } }
+        customer: { type: object }
+        shipping_address: { type: object }
+        line_items: { type: array, items: { type: object } }
+        shipping_lines: { type: array, items: { type: object } }
+        fulfillments: { type: array, items: { $ref: "#/components/schemas/Fulfillment" } }
+        x_chattrn:
+          type: object
+          properties: { expected_delivery_date: { type: string, format: date } }
+    DraftOrder:
+      type: object
+      properties:
+        id: { type: [integer, string] }
+        line_items: { type: array, items: { type: object } }
+        subtotal_price: { $ref: "#/components/schemas/Money" }
+        total_tax: { $ref: "#/components/schemas/Money" }
+        total_price: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        shipping_line: { type: object }
+        applied_discount: { type: object }
+        status: { type: string, enum: [open, completed] }
+        order_id: { type: [integer, string, "null"] }
+        x_chattrn:
+          type: object
+          properties:
+            discount_code: { type: string }
+            location_id: { type: [integer, string] }
+    Store:
+      type: object
+      required: [name, domain, currency, country_code, iana_timezone, api_version, delivery_mode, capabilities, product_url_template]
+      properties:
+        name: { type: string }
+        domain: { type: string }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        country_code: { type: string, pattern: "^[A-Z]{2}$" }
+        iana_timezone: { type: string, example: Asia/Dhaka }
+        api_version: { type: string, example: "2026-10" }
+        delivery_mode: { type: string, enum: [zone, outlet] }
+        capabilities:
+          type: object
+          properties:
+            products: { type: boolean }
+            product_search: { type: boolean }
+            inventory_levels: { type: boolean }
+            locations_resolve: { type: boolean }
+            customers_search: { type: boolean }
+            orders_read: { type: boolean }
+            orders_cancel: { type: boolean }
+            draft_orders: { type: boolean }
+            draft_orders_complete: { type: boolean }
+            delivery_rates: { type: boolean }
+        product_url_template: { type: string, example: "https://example.com/product/{handle}" }
+        cart_url_template: { type: string }
+        admin_order_url_template: { type: string }
+responses:
+  Errors:
+    description: Validation, access or lookup error.
+    content: { application/json: { schema: { $ref: "#/components/schemas/Errors" } } }
+paths:
+  /store.json:
+    get:
+      summary: Store profile and capabilities
+      operationId: getStore
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { store: { $ref: "#/components/schemas/Store" } } } } } }
+        "401": { $ref: "#/responses/Errors" }
+  /products.json:
+    get:
+      summary: Catalog import and sync (Link-header pagination)
+      operationId: listProducts
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/pageInfo"
+        - $ref: "#/components/parameters/fields"
+        - { name: since_id, in: query, schema: { type: [integer, string] } }
+        - { name: updated_at_min, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: OK. A Link response header carries rel="next"/"previous" when more pages exist.
+          content: { application/json: { schema: { type: object, properties: { products: { type: array, items: { $ref: "#/components/schemas/Product" } } } } } }
+  /products/count.json:
+    get:
+      summary: Import progress, full-catalog check
+      operationId: countProducts
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { count: { type: integer } } } } } }
+  /products/{id}.json:
+    get:
+      summary: Live price and stock before every answer
+      operationId: getProduct
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { product: { $ref: "#/components/schemas/Product" } } } } } }
+        "404": { $ref: "#/responses/Errors" }
+  /products/search.json:
+    get:
+      summary: Text search, best match first
+      operationId: searchProducts
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { products: { type: array, items: { $ref: "#/components/schemas/Product" } } } } } } }
+  /locations.json:
+    get:
+      summary: Zones or outlets
+      operationId: listLocations
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { locations: { type: array, items: { $ref: "#/components/schemas/Location" } } } } } } }
+  /locations/{id}.json:
+    get:
+      summary: One zone or outlet
+      operationId: getLocation
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { location: { $ref: "#/components/schemas/Location" } } } } } }
+  /inventory_levels.json:
+    get:
+      summary: Stock per variant per location (max 50 ids per filter)
+      operationId: getInventoryLevels
+      parameters:
+        - { name: inventory_item_ids, in: query, schema: { type: string }, description: Comma-separated, max 50. }
+        - { name: location_ids, in: query, schema: { type: string }, description: Comma-separated, max 50. }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { inventory_levels: { type: array, items: { $ref: "#/components/schemas/InventoryLevel" } } } } } } }
+        "422": { description: Neither inventory_item_ids nor location_ids was sent., content: { application/json: { schema: { $ref: "#/components/schemas/Errors" } } } }
+  /locations/resolve.json:
+    get:
+      summary: Turns a customer's area into a location
+      operationId: resolveArea
+      parameters: [{ name: area, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: OK, within 500 ms.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resolution:
+                    type: object
+                    properties:
+                      query: { type: string }
+                      matches: { type: array, items: { type: object, properties: { location_id: { type: [integer, string] }, name: { type: string }, confidence: { type: number, minimum: 0, maximum: 1 } } } }
+                      serviceable: { type: boolean }
+  /delivery/rates.json:
+    get:
+      summary: Fee and days per zone before a cart exists
+      operationId: getDeliveryRates
+      parameters: [{ name: location_id, in: query, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delivery_rates:
+                    type: array
+                    items:
+                      type: object
+                      properties: { code: { type: string }, title: { type: string }, price: { $ref: "#/components/schemas/Money" }, currency: { type: string }, min_days: { type: integer }, max_days: { type: integer }, cod_available: { type: boolean } }
+  /customers/search.json:
+    get:
+      summary: "Find a customer by phone or email (query=phone:+8801...  or  query=email:...)"
+      operationId: searchCustomers
+      parameters: [{ name: query, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { customers: { type: array, items: { $ref: "#/components/schemas/Customer" } } } } } } }
+        "403": { $ref: "#/responses/Errors" }
+  /customers/{id}/orders.json:
+    get:
+      summary: "A verified customer's orders (Chattrn addition)"
+      operationId: getCustomerOrders
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { orders: { type: array, items: { $ref: "#/components/schemas/Order" } } } } } } }
+  /orders.json:
+    get:
+      summary: Order by number; one sample order for testing
+      operationId: listOrders
+      parameters:
+        - { name: status, in: query, schema: { type: string, default: any } }
+        - { name: name, in: query, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { orders: { type: array, items: { $ref: "#/components/schemas/Order" } } } } } } }
+        "401": { $ref: "#/responses/Errors" }
+  /orders/{id}.json:
+    get:
+      summary: Status, items, tracking
+      operationId: getOrder
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { order: { $ref: "#/components/schemas/Order" } } } } } }
+  /orders/{id}/fulfillments.json:
+    get:
+      summary: Tracking (may be embedded on the order instead)
+      operationId: getOrderFulfillments
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { fulfillments: { type: array, items: { $ref: "#/components/schemas/Fulfillment" } } } } } } }
+  /orders/{id}/cancel.json:
+    post:
+      summary: Cancel an order
+      operationId: cancelOrder
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { reason: { type: string, enum: [customer, fraud, inventory, declined, other] } } } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { order: { $ref: "#/components/schemas/Order" } } } } } }
+        "422": { description: A shipped order can't be cancelled., content: { application/json: { schema: { $ref: "#/components/schemas/Errors" } } } }
+  /draft_orders.json:
+    post:
+      summary: Cart quote with real totals
+      operationId: createDraftOrder
+      requestBody: { content: { application/json: { schema: { type: object, properties: { draft_order: { type: object } } } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { type: object, properties: { draft_order: { $ref: "#/components/schemas/DraftOrder" } } } } } }
+        "202": { description: Still computing; poll with Retry-After. }
+  /draft_orders/{id}.json:
+    put:
+      summary: Replace the cart (one draft reused per conversation)
+      operationId: updateDraftOrder
+      parameters: [{ name: id, in: path, required: true, schema: { type: [integer, string] } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { draft_order: { type: object } } } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { draft_order: { $ref: "#/components/schemas/DraftOrder" } } } } } }
+  /draft_orders/{id}/complete.json:
+    put:
+      summary: Place a cash-on-delivery order
+      operationId: completeDraftOrder
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: [integer, string] } }
+        - { name: payment_pending, in: query, required: true, schema: { type: boolean, enum: [true] } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { draft_order: { $ref: "#/components/schemas/DraftOrder" } } } } } }

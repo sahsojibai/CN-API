@@ -1,0 +1,2966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect a custom website: tester</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f1f4f5; --surface: #ffffff; --fg: #425066; --fg-strong: #232f40; --muted: #6c7584; --muted2: #7b8594;
+  --line: #dae0e4; --line2: #e7ebee; --field: #f8f9fa; --chip-bg: #edf1f3;
+  --brand: #a946ba; --brand-fg: #ffffff; --rail: #dae0e4;
+  --pass: #107062; --warn: #e98b00; --fail: #d31b1b; --skip: #6c7584;
+  --pass-bg: #e6f4f1; --warn-bg: #fdf3e1; --fail-bg: #fbe9e9; --skip-bg: #edf1f3; --code-bg: #f1f4f5;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 13px/20px Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+h1, h2, h3, p { margin: 0; }
+.hint, .meta { font-size: 12px; line-height: 18px; color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+[hidden] { display: none !important; }
+
+/* ---- App frame ---- */
+.app { display: grid; grid-template-columns: 50px 210px 1fr; min-height: 100vh; }
+.rail { background: var(--rail); display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 14px 0; }
+.rail-group { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.rail-item { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+.rail-item.on { background: var(--surface); color: var(--brand); box-shadow: 0 0 1.5px rgba(9,30,66,.15); }
+.side { background: var(--bg); padding: 14px; display: flex; flex-direction: column; gap: 20px; }
+.side h2 { font-size: 18px; line-height: 26px; font-weight: 500; color: var(--fg-strong); padding-left: 10px; }
+.side .cat { font-size: 12px; font-weight: 600; line-height: 18px; color: var(--muted2); text-transform: uppercase; padding-left: 10px; margin-bottom: 9px; }
+.side .nav { display: flex; flex-direction: column; gap: 2px; }
+.side .nav a { display: block; padding: 8px; border-radius: 8px; color: var(--fg); text-decoration: none; height: 36px; line-height: 20px; }
+.side .nav a.on { background: var(--surface); color: var(--fg-strong); font-weight: 600; box-shadow: 0 0 1.5px rgba(9,30,66,.15); }
+.main { background: var(--surface); display: flex; flex-direction: column; min-width: 0; border-radius: 10px 0 0 0; box-shadow: 0 9px 23.5px rgba(0,0,0,.06); }
+.topbar { display: flex; align-items: center; gap: 8px; height: 50px; padding: 11px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.topbar .crumb { color: var(--fg); }
+.topbar .crumb.dim { color: var(--muted); }
+.topbar .crumb-link { text-decoration: none; cursor: pointer; }
+.topbar .crumb-link:hover { color: var(--brand); text-decoration: underline; }
+.topbar .sep { color: var(--muted2); }
+.content { padding: 24px; display: flex; flex-direction: column; gap: 20px; max-width: 1180px; width: 100%; }
+
+/* ---- Page header and stepper ---- */
+.page-title { font-size: 22px; line-height: 34px; font-weight: 600; color: var(--fg); }
+.page-sub { font-size: 12px; line-height: 18px; color: var(--muted); margin-top: 6px; max-width: 700px; }
+.stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stepper.stepper-3 { grid-template-columns: repeat(3, 1fr); }
+.step, .cstep, .lstep { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; color: inherit; font: inherit; min-width: 0; }
+.step.on, .cstep.on, .lstep.on { border: 1.5px solid var(--brand); }
+.step .num, .cstep .num, .lstep .num { width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; font-weight: 600; font-size: 13px; border: 1.5px solid var(--line2); color: var(--muted); flex: none; }
+.step.on .num, .cstep.on .num, .lstep.on .num { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.step .t, .cstep .t, .lstep .t { font-weight: 600; font-size: 14px; line-height: 20px; color: var(--fg); }
+.step .s, .cstep .s, .lstep .s { font-size: 12px; line-height: 18px; color: var(--muted); }
+
+/* ---- Cards ---- */
+.card { background: var(--surface); border: 1px solid var(--line2); border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.card-head h3 { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--fg); }
+.card-head p { font-size: 13px; line-height: 20px; color: var(--muted); margin-top: 4px; }
+.row2 { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.row2 > .field { flex: 1 1 240px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label { font-weight: 500; font-size: 13px; line-height: 20px; color: var(--fg); }
+input, select {
+  font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  height: 40px; padding: 0 12px; width: 100%; min-width: 0;
+}
+input::placeholder { color: var(--muted2); }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, .step:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+button {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 10px; padding: 6px 12px; height: auto;
+  border: 0; background: var(--chip-bg); color: var(--fg); white-space: nowrap; font-size: 14px; line-height: 20px;
+}
+button.primary { background: var(--brand); color: var(--brand-fg); }
+button.plain { background: transparent; border: 1px solid var(--line); }
+button:disabled { opacity: 0.55; cursor: default; }
+.chip { display: inline-block; font-size: 12px; font-weight: 600; line-height: 18px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.s-pass { color: var(--pass); background: var(--pass-bg); }
+.s-warn { color: var(--warn); background: var(--warn-bg); }
+.s-fail { color: var(--fail); background: var(--fail-bg); }
+.s-skip { color: var(--skip); background: var(--skip-bg); }
+.ok { color: var(--pass); font-weight: 600; }
+.miss { color: var(--fail); font-weight: 600; }
+.part { color: var(--warn); font-weight: 600; }
+
+/* ---- Endpoint rows ---- */
+.group-label { font-size: 11px; font-weight: 600; line-height: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+.ep { display: grid; grid-template-columns: 170px 1fr 200px; gap: 16px; align-items: start; border-top: 1px solid var(--line2); padding: 12px 0; }
+.ep:first-of-type { border-top: 0; }
+.ep .name { font-weight: 600; color: var(--fg); }
+.ep .purpose { font-size: 12px; line-height: 18px; color: var(--muted); }
+.pathline { display: grid; grid-template-columns: auto 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.pathline .method { font: 600 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); background: var(--field); padding: 0 10px; display: flex; align-items: center; border-right: 1px solid var(--line); }
+.pathline input { border: 0; border-radius: 0; height: 36px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.pathline input:focus-visible { outline-offset: -2px; }
+.ep-status { font-size: 12px; line-height: 18px; color: var(--muted); }
+.ep-status b { display: block; font-size: 12px; line-height: 18px; }
+.params { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.params .field { flex: 1 1 160px; }
+.params .field label { font-size: 12px; }
+.params input { height: 34px; }
+.row-actions { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+.result { font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.result:empty { display: none; }
+details summary { cursor: pointer; font-size: 13px; color: var(--brand); margin-top: 4px; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0 0; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line2); vertical-align: top; }
+th { background: var(--field); font-size: 12px; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.val { max-width: 320px; overflow-wrap: anywhere; }
+select { height: 36px; }
+
+/* ---- Tiles, choices, zones ---- */
+.verdict { font-size: 16px; font-weight: 600; }
+.counts { display: flex; gap: 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.tiles div { background: var(--field); border: 1px solid var(--line2); border-radius: 8px; padding: 10px 12px; }
+.tiles b { display: block; font-size: 20px; line-height: 28px; font-variant-numeric: tabular-nums; color: var(--fg-strong); }
+.tiles span { font-size: 12px; color: var(--muted); }
+.choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; background: var(--surface); min-width: 0; flex: 1 1 260px; }
+.choice input { width: auto; height: auto; margin-top: 3px; flex: none; }
+.choices { display: flex; gap: 12px; flex-wrap: wrap; }
+.zchip { font-size: 13px; padding: 5px 12px; border-radius: 999px; background: var(--chip-bg); }
+.zchip[aria-pressed="true"], [role="tab"][aria-selected="true"] { background: var(--brand); color: var(--brand-fg); }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- Map fields (Figma layout) ---- */
+.sparkle { width: 40px; height: 40px; border-radius: 10px; background: var(--field); display: grid; place-items: center; flex: none; color: var(--brand); font-size: 18px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 500; line-height: 16px; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
+.b-pass { background: #dcf9dc; color: #107062; }
+.b-warn { background: #fff2df; color: #e98b00; }
+.b-fail { background: #fbe9e9; color: #d31b1b; }
+.b-skip { background: #f1f4f5; color: #232f40; }
+.b-info { background: #ecf3fe; color: #3178e2; }
+.tabs2 { display: flex; gap: 24px; border-bottom: 1px solid var(--line2); padding: 0 16px; flex-wrap: wrap; }
+.tabs2 button { background: none; border: 0; border-radius: 0; padding: 14px 0 12px; color: var(--muted); font-weight: 400; font-size: 14px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs2 button[aria-selected="true"] { color: var(--brand); font-weight: 600; border-bottom-color: var(--brand); }
+.count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--line); color: var(--fg); font-size: 11px; font-weight: 600; margin-left: 4px; }
+.mtable-scroll { overflow-x: auto; }
+.mtable { min-width: 900px; }
+.mhead, .mrow { display: grid; grid-template-columns: 260px minmax(280px, 1fr) 220px 130px; gap: 16px; align-items: center; padding: 12px 16px; }
+.mhead { font-size: 12px; font-weight: 500; color: var(--fg-strong); padding: 10px 16px; background: var(--field); border-top: 1px solid var(--line2); }
+.mrow { border-top: 1px solid var(--line2); }
+.mrow-check { background: #fff2df; }
+.mname { font-weight: 600; font-size: 13px; color: var(--fg); }
+.mtag { display: inline-block; background: var(--field); border: 1px solid var(--line2); border-radius: 4px; padding: 1px 6px; margin-top: 4px; font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
+.mrow select { height: 36px; max-width: 280px; }
+.xrow { display: flex; gap: 14px; align-items: center; border-top: 1px solid var(--line2); padding: 12px 0; }
+.toggle { width: 40px; height: 20px; border-radius: 10px; border: 0; background: var(--line); position: relative; padding: 0; flex: none; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.toggle[aria-pressed="true"] { background: var(--pass); }
+.toggle[aria-pressed="true"]::after { left: 22px; }
+.step.done .num, .cstep.done .num, .lstep.done .num { background: var(--pass); border-color: var(--pass); color: #fff; }
+
+/* ---- Test connection (Figma layout) ---- */
+.banner { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 16px 24px; border-radius: 10px; border: 1px solid var(--line2); background: var(--surface); }
+.banner.ok { background: #dcf9dc; border-color: var(--line); }
+.banner.warn { background: var(--warn-bg); }
+.banner-body { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.banner button { padding: 6px 12px; color: #fff; border-radius: 10px; }
+.ico.big { width: 36px; height: 36px; border-radius: 18px; font-size: 16px; }
+.crow { display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--line2); padding: 12px 0; }
+.crow:first-of-type { border-top: 0; }
+.crow-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.crow-title { font-weight: 600; font-size: 14px; color: var(--fg); }
+.ico { width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.ico-pass { background: #dcf9dc; color: #107062; }
+.ico-warn { background: #fff2df; color: #e98b00; }
+.ico-fail { background: #fbe9e9; color: #d31b1b; }
+.ico-skip { background: #f1f4f5; color: #6c7584; }
+.sec-title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--fg); }
+.fields-wrap { display: flex; flex-direction: column; gap: 8px; }
+.fields-wrap > strong { font-size: 13px; font-weight: 500; color: var(--fg-strong); }
+.fields-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- Delivery setup (Figma layout) ---- */
+.opt { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; cursor: pointer; }
+.opt input[type="radio"], .opt input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; padding: 0; flex: none; accent-color: var(--brand); }
+.opt-title { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 500; font-size: 14px; color: var(--fg); }
+.badge.b-pink { background: #e8dcf8; color: var(--brand); }
+details summary { margin-top: 4px; }
+
+/* ---- Footer ---- */
+.footer { border-top: 1px solid var(--line); display: flex; justify-content: center; gap: 12px; padding: 16px 24px; margin-top: auto; }
+.footer button { padding: 8px 14px; }
+
+@media (max-width: 1000px) {
+  .app { grid-template-columns: 1fr; }
+  .rail, .side { display: none; }
+  .main { border-radius: 0; box-shadow: none; }
+  .stepper { grid-template-columns: repeat(2, 1fr); }
+  .ep { grid-template-columns: 1fr; gap: 8px; }
+}
+@media (max-width: 640px) {
+  .content { padding: 16px; }
+  .stepper { grid-template-columns: 1fr; }
+  .card { padding: 16px; }
+  .page-title { font-size: 20px; line-height: 30px; }
+}
+/* ---- Wizard spacing (Figma 33803:202996): 20px between stepper, store details, your API and endpoints ---- */
+[hidden] { display: none !important; }
+.wizard-view { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* ---- Connected stores (list view, Figma 34075:28023) ---- */
+.connect-card { flex-direction: row; align-items: center; gap: 12px; padding: 16px 20px; flex-wrap: wrap; }
+.connect-tile { width: 48px; height: 48px; border-radius: 12px; background: var(--line2); display: grid; place-items: center; flex: none; color: var(--fg); }
+.connect-copy { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.connect-copy h3 { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--fg-strong); }
+.connect-copy p { font-size: 12px; line-height: 18px; color: var(--muted); }
+.btn-connect { background: var(--brand); color: var(--brand-fg); border: 0; border-radius: 14px; padding: 14px 16px; font: 600 14px/20px Inter, sans-serif; cursor: pointer; flex: none; }
+.btn-connect:hover { filter: brightness(0.95); }
+.list-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.search-field { display: flex; align-items: center; gap: 8px; width: 242px; max-width: 100%; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted2); }
+.search-field input { border: 0; outline: 0; flex: 1; min-width: 0; font: 400 13px/20px Inter, sans-serif; color: var(--fg-strong); background: transparent; padding: 0; }
+.store-table th, .store-table td { padding: 12px; font-size: 13px; line-height: 20px; }
+.store-table th { background: var(--surface); font-size: 12px; font-weight: 500; color: var(--fg-strong); }
+.store-table td { color: var(--fg-strong); }
+.store-table .act { text-align: center; width: 72px; }
+.store-name { display: inline-flex; align-items: center; gap: 8px; }
+.store-logo { width: 24px; height: 24px; border-radius: 6px; background: var(--line2); display: grid; place-items: center; color: var(--muted); flex: none; }
+.icon-btn { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; display: inline-grid; place-items: center; cursor: pointer; color: var(--fg); padding: 0; }
+.icon-btn:hover, .icon-btn[aria-expanded="true"] { background: var(--line2); }
+.store-menu { position: fixed; z-index: 20; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 9px 23.5px rgba(0,0,0,.12); padding: 4px; min-width: 160px; }
+.store-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 6px; font: 400 13px/20px Inter, sans-serif; color: var(--fg-strong); cursor: pointer; }
+.store-menu button:hover { background: var(--field); }
+@media (max-width: 640px) { .btn-connect { width: 100%; } .search-field { width: 100%; } }
+/* ---- Store overview (Figma 34078:29294) ---- */
+.store-link { background: none; border: 0; padding: 0; color: var(--fg-strong); font: 500 13px/20px Inter, sans-serif; cursor: pointer; text-align: left; }
+.store-link:hover { color: var(--brand); text-decoration: underline; }
+.detail-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: start; }
+.subnav { display: flex; flex-direction: column; gap: 4px; }
+.subnav-item { display: flex; align-items: center; min-height: 36px; padding: 8px; border-radius: 10px; font-size: 13px; line-height: 20px; color: var(--muted); }
+.subnav-item.on { background: var(--bg); color: var(--fg-strong); font-weight: 600; }
+.detail-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card-title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--fg); }
+.kv { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 13px; line-height: 20px; border-bottom: 1px solid var(--line2); }
+.kv:last-of-type { border-bottom: 0; }
+.kv-l { color: var(--muted); flex: 0 0 auto; }
+.kv-v { font-weight: 500; color: var(--fg); text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.kv-v a { color: var(--brand); text-decoration: none; }
+.kv-v a:hover { text-decoration: underline; }
+.detail-actions { display: flex; gap: 8px; padding-top: 8px; flex-wrap: wrap; }
+.btn-grey { background: var(--chip-bg); color: var(--fg); border: 0; border-radius: 8px; height: 28px; padding: 0 10px; font: 500 13px/16px Inter, sans-serif; cursor: pointer; }
+.btn-red { background: var(--fail); color: #fff; border: 0; border-radius: 8px; height: 28px; padding: 0 10px; font: 500 13px/16px Inter, sans-serif; cursor: pointer; }
+@media (max-width: 640px) { .detail-layout { grid-template-columns: 1fr; } }
+/* ---- Connection-type choice and Chattrn API wizard ---- */
+.conn-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.conn-choice-card { display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; }
+.conn-choice-card h3 { font-size: 15px; }
+.conn-choice-card p { color: var(--muted); font-size: 13px; line-height: 20px; margin: 0; }
+.conn-choice-card .badge { align-self: flex-start; }
+@media (max-width: 640px) { .conn-choice-grid { grid-template-columns: 1fr; } }
+.site-check-card { background: var(--field); border: 1px solid var(--line2); border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.site-check-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.site-check-row .field { flex: 1 1 320px; min-width: 0; }
+.site-check-row .field label { font-size: 13px; font-weight: 500; color: var(--fg); }
+.site-check-row .field label .dim { color: var(--muted); font-weight: 400; }
+.site-check-hint { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.site-check-hint svg { flex: none; color: var(--muted2); }
+.or-divider { display: flex; align-items: center; gap: 12px; color: var(--muted2); font-size: 12px; }
+.or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: var(--line2); }
+.or-divider span { background: var(--chip-bg); padding: 3px 12px; border-radius: 999px; }
+.ways-heading { font-size: 14px; font-weight: 600; color: var(--fg-strong); }
+.conn-row-list { display: flex; flex-direction: column; gap: 10px; }
+.conn-row { display: flex; align-items: center; gap: 14px; min-height: 80px; padding: 12px 20px; background: var(--surface); border: 1px solid var(--line2); border-radius: 10px; }
+.conn-row .icon-tile { width: 36px; height: 36px; border-radius: 8px; background: var(--field); display: grid; place-items: center; color: var(--brand); flex: none; }
+.conn-row .row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.conn-row .row-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--fg-strong); }
+.conn-row .row-desc { font-size: 13px; color: var(--muted); }
+.conn-row .row-connect { flex: none; }
+/* ---- Laravel package installer (slice 3) ---- */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,41,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.modal-card { background: var(--surface); border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,41,.18); width: 100%; max-width: 520px; display: flex; flex-direction: column; }
+.modal-body { display: flex; flex-direction: column; gap: 14px; padding: 24px 24px 20px; }
+.modal-body .modal-top { display: flex; gap: 12px; align-items: flex-start; }
+.modal-icon { width: 40px; height: 40px; border-radius: 20px; background: var(--warn-bg); display: grid; place-items: center; color: var(--warn); flex: none; }
+.modal-close { background: transparent; border: 0; color: var(--muted); cursor: pointer; flex: none; padding: 0; }
+.modal-title { font-size: 18px; font-weight: 600; line-height: 26px; color: var(--fg-strong); margin: 0; }
+.modal-text { font-size: 14px; line-height: 20px; color: var(--muted); margin: 6px 0 0; }
+.modal-options { background: var(--field); border: 1px solid var(--line2); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.modal-options .opt-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 20px; color: var(--fg); }
+.modal-options .opt-row .dot { width: 6px; height: 6px; border-radius: 3px; background: var(--muted); margin-top: 7px; flex: none; }
+.modal-footer { border-top: 1px solid var(--line2); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+.cmd-row { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line2); }
+.cmd-row:first-of-type { border-top: 0; }
+.cmd-row .num { width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; font-weight: 600; font-size: 13px; border: 1.5px solid var(--line2); color: var(--muted); flex: none; margin-top: 2px; }
+.cmd-row .cmd-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cmd-row .cmd-title { font-weight: 600; font-size: 14px; color: var(--fg); }
+.cmd-row .cmd-sub { font-size: 12px; color: var(--muted); }
+.cmd-line { display: flex; align-items: center; gap: 10px; background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+.cmd-line code { flex: 1; min-width: 0; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg-strong); overflow-x: auto; white-space: nowrap; }
+.wait-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line2); }
+.wait-row:first-of-type { border-top: 0; }
+.wait-row .wicon { width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; flex: none; margin-top: 2px; font-size: 12px; }
+.wait-row .wicon.pass { background: var(--pass-bg); color: var(--pass); }
+.wait-row .wicon.warn { background: var(--warn-bg); color: var(--warn); }
+.wait-row .wicon.pending { background: var(--skip-bg); color: var(--skip); }
+.wait-row .wbody { flex: 1; min-width: 0; }
+.wait-row .wtitle { font-weight: 600; font-size: 13px; color: var(--fg); }
+.wait-row .wsub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.check-list { display: flex; flex-direction: column; gap: 0; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line2); }
+.check-row:last-child { border-bottom: 0; }
+.check-row .label { flex: 0 0 180px; font-weight: 500; font-size: 13px; }
+.check-row .msg { flex: 1 1 auto; font-size: 13px; color: var(--muted); }
+.dq-list { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Primary">
+    <div class="rail-group">
+      <div class="rail-item" aria-hidden="true">◎</div>
+      <div class="rail-item" aria-hidden="true">⋔</div>
+      <div class="rail-item" aria-hidden="true">▥</div>
+    </div>
+    <div class="rail-group">
+      <div class="rail-item" aria-hidden="true">▤</div>
+      <div class="rail-item on" aria-hidden="true">⧉</div>
+      <div class="rail-item" aria-hidden="true">⚙</div>
+    </div>
+  </nav>
+
+  <aside class="side" aria-label="Integrations">
+    <h2>Integrations</h2>
+    <div>
+      <div class="cat">Categories</div>
+      <nav class="nav">
+        <a href="#" onclick="return false">All Integrations</a>
+        <a href="#" onclick="return false">BI &amp; Analytics</a>
+        <a href="#" onclick="return false">Communication Channels</a>
+        <a href="#" onclick="return false">CRM</a>
+        <a href="#" class="on" onclick="return false">E-commerce</a>
+        <a href="#" onclick="return false">Marketing automation</a>
+      </nav>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <a href="#" class="crumb dim crumb-link" id="crumbAll">All Integrations</a>
+      <span class="sep">›</span>
+      <span class="crumb">Custom website API</span>
+      <span class="sep" id="crumbStoreSep" hidden>›</span>
+      <span class="crumb" id="crumbStore" hidden></span>
+    </div>
+
+    <div class="content">
+      <section id="listView" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="banner ok" id="listBanner" hidden><div class="banner-body"><span id="listBannerText" style="font-size:13px;color:var(--fg-strong)"></span></div></div>
+        <div class="card connect-card">
+          <div class="connect-tile" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></div>
+          <div class="connect-copy">
+            <h3>Connect website</h3>
+            <p>Connect your website store to quickly set up chat widget on your store</p>
+          </div>
+          <button type="button" class="btn-connect" id="connectBtn">Connect</button>
+        </div>
+        <div class="list-tools" id="listTools" hidden>
+          <label class="search-field"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input type="search" id="storeSearch" placeholder="Search" autocomplete="off" aria-label="Search connected stores"></label>
+        </div>
+        <div class="table-wrap" id="storeTableWrap" hidden>
+          <table class="store-table">
+            <thead><tr><th>Store</th><th>Website</th><th>Assign brand</th><th>Status</th><th class="act">Action</th></tr></thead>
+            <tbody id="storeRows"></tbody>
+          </table>
+        </div>
+        <div id="storeMenu" class="store-menu" hidden><button type="button" id="copyStoreId">Copy store ID</button></div>
+      </section>
+      <section id="connectChoiceView" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div><button type="button" class="plain" id="backFromChoice" style="color:var(--brand)">&larr; Connected stores</button></div>
+        <header>
+          <h1 class="page-title">Connect your website</h1>
+          <p class="page-sub">Enter your website address. Chattrn checks how it's built and recommends the easiest way to connect it.</p>
+        </header>
+        <div class="site-check-card">
+          <div class="site-check-row">
+            <div class="field">
+              <label for="siteCheckUrl">Your Website address <span class="dim">(check before connect)</span></label>
+              <input type="text" id="siteCheckUrl" placeholder="https://www.yourstore.com">
+            </div>
+            <button type="button" class="primary" id="siteCheckBtn">Check website</button>
+          </div>
+          <div class="site-check-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+            <span>Takes about 5 seconds. We only read public pages; nothing on your website changes.</span>
+          </div>
+        </div>
+        <div class="or-divider"><span>or</span></div>
+        <div class="ways-heading">Ways to connect a custom website</div>
+        <div class="conn-row-list">
+          <div class="conn-row">
+            <div class="icon-tile">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </div>
+            <div class="row-body">
+              <div class="row-title">Chattrn API <span class="badge b-info">Developer needed</span></div>
+              <div class="row-desc">Your developer adds our endpoints.</div>
+            </div>
+            <button type="button" class="btn-grey row-connect" id="chooseChattrnApi">Connect</button>
+          </div>
+          <div class="conn-row">
+            <div class="icon-tile">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"></path></svg>
+            </div>
+            <div class="row-body">
+              <div class="row-title">Map my existing API</div>
+              <div class="row-desc">Your site already has an API. AI matches its fields; nothing to rebuild.</div>
+            </div>
+            <button type="button" class="btn-grey row-connect" id="chooseMappedApi">Connect</button>
+          </div>
+          <div class="conn-row">
+            <div class="icon-tile">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.5v11L12 22l-9-4.5v-11z"></path><path d="M12 22V12M21 6.5L12 12L3 6.5"></path></svg>
+            </div>
+            <div class="row-body">
+              <div class="row-title">Laravel package</div>
+              <div class="row-desc">Your developer runs one install command.</div>
+            </div>
+            <button type="button" class="btn-grey row-connect" id="chooseLaravel">Connect</button>
+          </div>
+        </div>
+      </section>
+      <section id="detailView" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="detail-layout">
+          <nav class="subnav" aria-label="Store sections">
+            <span class="subnav-item on" aria-current="page">Overview</span>
+            <span class="subnav-item">Skills</span>
+            <span class="subnav-item">Knowledge</span>
+            <span class="subnav-item">Actions</span>
+            <span class="subnav-item">Product</span>
+            <span class="subnav-item">Connection</span>
+          </nav>
+          <div class="detail-main" id="detailBody"></div>
+        </div>
+      </section>
+        <div id="chattrnWizardView" class="wizard-view" hidden>
+      <header>
+        <h1 class="page-title">Chattrn API &middot; Store and API</h1>
+        <p class="page-sub">Connect a store that already speaks the Chattrn API: the same resources and fields as Shopify's Admin REST API, read with your access token.</p>
+      </header>
+
+      <div class="stepper stepper-3" aria-label="Setup steps">
+        <button type="button" class="cstep" data-cstep="1"><span class="num">1</span><span><span class="t" style="display:block">Store and API</span><span class="s">Base URL and access token</span></span></button>
+        <button type="button" class="cstep" data-cstep="2"><span class="num">2</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
+        <button type="button" class="cstep" data-cstep="3"><span class="num">3</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
+      </div>
+
+      <!-- STEP 1: Store and API -->
+      <section data-cpanel="1" style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <div class="card-head"><div><h3>Store details</h3><p>How the store appears in Chattrn and which brand's conversations it serves.</p></div></div>
+          <div class="row2">
+            <div class="field"><label for="cStoreName">Store name</label><input type="text" id="cStoreName" placeholder="e.g. My store" autocomplete="off"></div>
+            <div class="field"><label for="cSiteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="cSiteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="cBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="cBrand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="cStoreType">Store Type <span style="color:var(--fail)">*</span></label>
+              <select id="cStoreType" aria-label="Store Type"><option value="zone" selected>Zone-based</option><option value="outlet">Outlet-based</option></select>
+            </div>
+          </div>
+          <p class="hint" id="cDetailsErr" style="color:var(--fail)" hidden></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h3>API connection</h3><p>Your store's Chattrn API base URL and the access token it issued.</p></div>
+            <a class="plain" href="/openapi.yaml" target="_blank" rel="noopener">Download API Spec (OpenAPI)</a>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="cBase">API base URL</label><input type="text" id="cBase" placeholder="https://your-store.com/chattrn/api/2026-10" autocomplete="off"><span class="hint">Local mock: http://127.0.0.1:3102/chattrn/api/2026-10</span></div>
+            <div class="field"><label for="cToken">Access token</label><input type="password" id="cToken" autocomplete="off" spellcheck="false"><span class="hint">Sent as X-Chattrn-Access-Token. Stored encrypted, never shown again.</span></div>
+          </div>
+          <p class="hint" id="cCheckMsg" style="min-height:18px"></p>
+        </div>
+      </section>
+
+      <!-- STEP 2: Test connection -->
+      <section data-cpanel="2" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div id="cTestPanel"></div>
+      </section>
+
+      <!-- STEP 3: Delivery setup -->
+      <section data-cpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="card" id="cDeliveryCard">
+          <div class="card-head">
+            <div><div class="sec-title">Delivery zones</div><p class="hint" style="margin-top:4px">Zones, areas and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p></div>
+            <span class="badge b-skip">Read from GET /locations.json</span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Zone</th><th>Areas</th><th>Minimum order</th></tr></thead>
+            <tbody id="cZoneRows"><tr><td colspan="3" class="hint">Loading zones…</td></tr></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div><div class="sec-title">When should the AI ask for the area?</div><p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p></div>
+          <label class="opt"><input type="radio" name="cAsk" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span></span></label>
+          <label class="opt"><input type="radio" name="cAsk"><span><span class="opt-title">At the start of every new chat</span></span></label>
+          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" id="cRemember" checked><span class="opt-title">Remember the area for returning customers</span></label>
+        </div>
+      </section>
+
+      <div class="footer" style="border:0;padding:0;margin-top:0">
+        <button type="button" class="plain" id="cBack">Back</button>
+        <button type="button" class="primary" id="cNext">Continue: test connection</button>
+      </div>
+      <p class="hint" id="cFinishNote" role="status" style="margin:0;min-height:18px"></p>
+      </div>
+        <div id="laravelWizardView" class="wizard-view" hidden>
+      <header>
+        <h1 class="page-title">Laravel package &middot; Install package</h1>
+        <p class="page-sub">Your developer runs a few commands in the Laravel app. Once the package registers, it reads the same way a native Chattrn API store does.</p>
+      </header>
+
+      <div class="stepper stepper-3" aria-label="Setup steps">
+        <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Install package</span><span class="s">Composer and artisan commands</span></span></button>
+        <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
+        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
+      </div>
+
+      <!-- STEP 1: Install package -->
+      <section data-lpanel="1" style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <div class="card-head"><div><h3>Store details</h3><p>How the store appears in Chattrn and which brand's conversations it serves.</p></div></div>
+          <div class="row2">
+            <div class="field"><label for="lStoreName">Store name</label><input type="text" id="lStoreName" placeholder="e.g. My store" autocomplete="off"></div>
+            <div class="field"><label for="lSiteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="lSiteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="lBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="lBrand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="lStoreType">Store Type <span style="color:var(--fail)">*</span></label>
+              <select id="lStoreType" aria-label="Store Type"><option value="zone" selected>Zone-based</option><option value="outlet">Outlet-based</option></select>
+            </div>
+          </div>
+          <p class="hint" id="lDetailsErr" style="color:var(--fail)" hidden></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div><h3>Install the Chattrn package</h3><p>Have your developer run these in the Laravel app's root, in order.</p></div></div>
+          <div class="cmd-row">
+            <span class="num">1</span>
+            <div class="cmd-body">
+              <span class="cmd-title">Add the package</span>
+              <div class="cmd-line"><code>composer require chattrn/connector</code><button type="button" class="plain copy-cmd" data-copy="composer require chattrn/connector">Copy</button></div>
+            </div>
+          </div>
+          <div class="cmd-row">
+            <span class="num">2</span>
+            <div class="cmd-body">
+              <span class="cmd-title">Run the installer</span>
+              <div class="cmd-line"><code>php artisan chattrn:install</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:install">Copy</button></div>
+            </div>
+          </div>
+          <div class="cmd-row">
+            <span class="num">3</span>
+            <div class="cmd-body">
+              <span class="cmd-title">Connection token <span class="dim">(single-use, expires in 30 minutes)</span></span>
+              <span class="cmd-sub">Paste this as a line in the app's <code>.env</code> file. <strong>Keep it private.</strong></span>
+              <div class="cmd-line"><code id="lTokenLine">Generate a token to continue&hellip;</code><button type="button" class="plain copy-cmd" id="lCopyToken" data-copy="">Copy</button></div>
+              <div><button type="button" class="btn-grey" id="lGenToken">Generate token</button> <span class="hint" id="lTokenNote" style="margin:0"></span></div>
+            </div>
+          </div>
+          <div class="cmd-row">
+            <span class="num">4</span>
+            <div class="cmd-body">
+              <span class="cmd-title">Map the models</span>
+              <span class="cmd-sub">Asks which Eloquent models are Product, Variant, Order and Customer, then registers with Chattrn.</span>
+              <div class="cmd-line"><code>php artisan chattrn:map</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:map">Copy</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Waiting for your store to finish connecting</h3><p>This updates automatically once the package registers.</p></div>
+            <button type="button" class="plain" id="lRecheck">Check again</button>
+          </div>
+          <div id="lWaitRows"><div class="wait-row"><span class="wicon pending">&middot;</span><div class="wbody"><div class="wtitle">Loading&hellip;</div></div></div></div>
+        </div>
+      </section>
+
+      <!-- STEP 2: Test connection -->
+      <section data-lpanel="2" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div id="lTestPanel"></div>
+      </section>
+
+      <!-- STEP 3: Delivery setup -->
+      <section data-lpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="card" id="lDeliveryCard">
+          <div class="card-head">
+            <div><div class="sec-title">Delivery zones</div><p class="hint" style="margin-top:4px">Zones, areas and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p></div>
+            <span class="badge b-skip">Read from GET /locations.json</span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Zone</th><th>Areas</th><th>Minimum order</th></tr></thead>
+            <tbody id="lZoneRows"><tr><td colspan="3" class="hint">Loading zones…</td></tr></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div><div class="sec-title">When should the AI ask for the area?</div><p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p></div>
+          <label class="opt"><input type="radio" name="lAsk" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span></span></label>
+          <label class="opt"><input type="radio" name="lAsk"><span><span class="opt-title">At the start of every new chat</span></span></label>
+          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" id="lRemember" checked><span class="opt-title">Remember the area for returning customers</span></label>
+        </div>
+      </section>
+
+      <div class="footer" style="border:0;padding:0;margin-top:0">
+        <button type="button" class="plain" id="lBack">Back</button>
+        <button type="button" class="primary" id="lNext">Continue: test connection</button>
+      </div>
+      <p class="hint" id="lFinishNote" role="status" style="margin:0;min-height:18px"></p>
+      </div>
+    <div id="laravelModalBackdrop" class="modal-backdrop" hidden>
+      <div class="modal-card">
+        <div class="modal-body">
+          <div class="modal-top">
+            <div class="modal-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+            </div>
+            <div>
+              <h3 style="margin:0 0 4px;font-size:15px">Laravel not detected</h3>
+              <p class="hint" id="laravelModalMsg" style="margin:0">We checked this website and didn't see signs of a Laravel app.</p>
+            </div>
+          </div>
+          <div class="modal-options">
+            <div class="opt-row"><span class="dot"></span><span>If this isn't a Laravel site, <strong>Map my existing API</strong> is usually the faster way to connect it.</span></div>
+            <div class="opt-row"><span class="dot"></span><span>If it is Laravel — behind a proxy, or not reachable from here — you can continue anyway.</span></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="plain" id="laravelModalSwitch">Use the recommended option</button>
+          <button type="button" class="primary" id="laravelModalContinue">Continue with Laravel</button>
+        </div>
+      </div>
+    </div>
+    <div id="wizardView" class="wizard-view" hidden>
+      <header>
+        <h1 class="page-title">Connect a custom website</h1>
+        <p class="page-sub">Connect your own ecommerce website through its API. Products, stock and orders then work in Skills, Actions, the AI Agent, the widget and the inbox, just like a Shopify store. Nothing is saved, and only GET requests are sent.</p>
+      </header>
+
+      <div class="stepper" aria-label="Setup steps">
+        <button type="button" class="step" data-step="1" ><span class="num">1</span><span><span class="t" style="display:block">Your API</span><span class="s">Endpoints and sign-in</span></span></button>
+        <button type="button" class="step" data-step="2" ><span class="num">2</span><span><span class="t" style="display:block">Map fields</span><span class="s">AI matches, you check</span></span></button>
+        <button type="button" class="step" data-step="3" ><span class="num">3</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
+        <button type="button" class="step" data-step="4" ><span class="num">4</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
+      </div>
+
+      <!-- STEP 1: Your API -->
+      <section data-panel="1" style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Store details</h3>
+              <p>How the store appears in Chattrn and which brand's conversations it serves.</p>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="storeName">Store name</label><input type="text" id="storeName" placeholder="e.g. My store" autocomplete="off"></div>
+            <div class="field"><label for="siteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="siteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="brand">Assign brand <span style="color:var(--fail)">*</span></label><select id="brand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="storeType">Store Type <span style="color:var(--fail)">*</span></label>
+              <select id="storeType" aria-label="Store Type">
+                <option value="zone" selected>Zone-based</option>
+                <option value="outlet">Outlet-based</option>
+              </select>
+            </div>
+          </div>
+          <p class="hint" id="detailsErr" style="color:var(--fail)" hidden></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Your API</h3>
+              <p>Tell Chattrn where your API is and how to sign in to it.</p>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="base">Base URL</label><input type="text" id="base" placeholder="https://your-store.com/api/shop" autocomplete="off"><span class="hint">Local: http://localhost:3456/api/shop</span></div>
+            <div class="field">
+              <label for="auth">Sign-in method</label>
+              <select id="auth">
+                <option value="none">None (public endpoints)</option>
+                <option value="key">API key in a header</option>
+                <option value="bearer">Bearer token</option>
+              </select>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field" id="headerBox" hidden><label for="header">Header name</label><input type="text" id="header" value="X-API-Key" autocomplete="off"></div>
+            <div class="field" id="keyBox" hidden><label for="key">API key or token</label><input type="password" id="key" autocomplete="off" spellcheck="false"><span class="hint">Sent to your Chattrn backend and stored encrypted there, so discovery can run. Not kept in the browser.</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3>Your endpoints</h3>
+              <p>Add the endpoints you already have. Chattrn calls each once to read a sample; nothing in your store changes. Use <code>:name</code> for values the tester fills in.</p>
+            </div>
+            <button type="button" class="plain runAll" id="testAll">Test all endpoints</button>
+          </div>
+          <div class="row2" style="gap:12px">
+            <div class="field" style="flex:0 0 auto;min-width:200px"><label for="pages">Product pages to read</label><input type="number" id="pages" value="20" min="1" max="50"></div>
+            <div class="field" style="flex:1 1 300px"><span class="hint" style="padding-top:26px">Reads pages 1 to N of the product list, so the full count comes back.</span></div>
+          </div>
+          <div id="rows" style="display:flex;flex-direction:column"></div>
+          <p class="hint">Create order, cancel order and cart price check are not tested here, because they change data in the store or need a signed-in customer.</p>
+        </div>
+      </section>
+
+      <!-- STEP 2: Map fields -->
+      <section data-panel="2" hidden>
+        <div id="mapPanel" style="display:flex;flex-direction:column;gap:20px"></div>
+      </section>
+
+      <!-- STEP 3: Test connection -->
+      <section data-panel="3" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div id="testPanel" style="display:flex;flex-direction:column;gap:20px"></div>
+
+        <div class="card" id="askCard">
+          <div class="card-head">
+            <div>
+              <h3>Ask about a product or stock</h3>
+              <p>Ask in your own words. Words in the question are matched against every loaded product. Each match is read again from the API for the zone or outlet, so you see price and availability there.</p>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field" style="flex:1 1 100%"><label for="askText">Your question</label><input type="text" id="askText" placeholder="e.g. Is 256GB black available in Zone 3? What is the price?" autocomplete="off"></div>
+            <div class="field" style="flex:1 1 220px"><label for="askZone">Zone or outlet value (optional)</label><input type="text" id="askZone" placeholder="Empty: use the zone in the question, or Delivery setup" autocomplete="off"></div>
+            <div class="field" style="flex:0 0 auto;justify-content:flex-end"><button type="button" class="primary" id="askBtn">Ask</button></div>
+          </div>
+          <div id="askAnswer" class="result"></div>
+        </div>
+
+        <div class="card" id="productData" hidden>
+          <div class="card-head">
+            <div>
+              <h3>Product data</h3>
+              <p id="productSummary"></p>
+            </div>
+          </div>
+          <h3 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Chattrn needs</h3>
+          <div class="table-wrap"><table><thead><tr><th>Field</th><th>Needed</th><th>Found in</th><th>Sample</th></tr></thead><tbody id="needTable"></tbody></table></div>
+          <h3 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Every field in the product list</h3>
+          <div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Found in</th><th>Sample</th></tr></thead><tbody id="fieldTable"></tbody></table></div>
+          <div><button type="button" id="copy" class="plain" hidden>Copy report</button></div>
+        </div>
+      </section>
+
+      <!-- STEP 4: Delivery setup -->
+      <section data-panel="4" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="card" id="deliveryCard">
+          <div class="card-head">
+            <div>
+              <div class="sec-title">Delivery zones</div>
+              <p class="hint" style="margin-top:4px">Zones, fees and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p>
+            </div>
+            <span class="badge b-skip">Read from GET /delivery-zone</span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Zone</th><th>Areas</th><th>Delivery fee</th><th>Minimum order</th><th>Products</th><th></th></tr></thead>
+            <tbody id="zoneRows"><tr><td colspan="6" class="hint">Press View all zones to read them from your API.</td></tr></tbody>
+          </table></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="plain" id="loadZones" style="color:var(--brand)">View all zones</button>
+            <button type="button" class="plain" id="findParam" style="color:var(--brand)">Find zone parameter</button>
+            <button type="button" class="plain" id="syncAll" style="color:var(--brand)">Sync all zones</button>
+            <span class="hint" id="zoneStatus"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <details>
+            <summary>Tester settings (not in the design)</summary>
+            <div class="row2" style="margin-top:12px">
+              <div class="field"><label for="ctxName">Send as query parameter</label><input type="text" id="ctxName" placeholder="Found by Find zone parameter" autocomplete="off"><span class="hint" id="ctxHint"></span></div>
+              <div class="field"><label for="ctxValue">Area or outlet value</label><input type="text" id="ctxValue" placeholder="Pick a zone below, or type an ID" autocomplete="off"></div>
+            </div>
+          </details>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="sec-title">When should the AI ask for the area?</div>
+            <p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p>
+          </div>
+          <label class="opt"><input type="radio" name="ask" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span><span class="hint" style="display:block">Order and policy questions don't need an area.</span></span></label>
+          <label class="opt"><input type="radio" name="ask"><span><span class="opt-title">At the start of every new chat</span><span class="hint" style="display:block">Simple, but adds a step for every customer.</span></span></label>
+          <label class="opt"><input type="radio" name="ask"><span><span class="opt-title">Use the area already picked on my website</span><span class="hint" style="display:block">Your website passes the area to the widget. Ask only if it's missing.</span></span></label>
+          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" checked><span class="opt-title">Remember the area for returning customers</span></label>
+        </div>
+      </section>
+
+      <div class="footer" style="border:0;padding:0;margin-top:0">
+        <button type="button" class="plain" id="back">Back</button>
+        <button type="button" class="primary" id="next">Continue: map fields with AI</button>
+      </div>
+        <p class="hint" id="finishNote" role="status" style="margin:0;min-height:18px"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var MONEY = /^\d+(\.\d+)?$/;
+  var ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+  var LISTKEYS = ["products", "data", "items", "results", "categories", "zones", "delivery_zones", "payment_methods", "methods", "orders", "banners"];
+  var state = { products: [], pageCount: 0, rowResults: {}, mode: "zone", ctxName: "", ctxValue: "", step: 1, tab: "product" };
+
+  var ROWS = [
+    { id: "products", group: "Required", name: "Product list", purpose: "Product sync", method: "GET", path: "/products?page=:page", kind: "list", required: true, context: true, params: { page: "1" } },
+    { id: "detail", group: "Required", name: "Product details", purpose: "Details, variants", method: "GET", path: "/products/:id", kind: "one", required: true, context: true, params: { id: "" } },
+    { id: "search", group: "Recommended", name: "Search", purpose: "Faster product search", method: "GET", path: "/search?q=:query", kind: "list", context: true, params: { query: "rice" } },
+    { id: "orders", group: "Recommended", name: "Orders by phone", purpose: "Order status (needs a signed-in customer)", method: "GET", path: "/orders?phone=:phone", kind: "list", params: { phone: "" } },
+    { id: "order", group: "Recommended", name: "Order details", purpose: "Tracking (needs a signed-in customer)", method: "GET", path: "/orders/:number", kind: "one", params: { number: "" } },
+    { id: "categories", group: "Optional", name: "Categories", purpose: "Browse by category", method: "GET", path: "/categories", kind: "list", params: {} },
+    { id: "zones", group: "Optional", name: "Delivery zones", purpose: "Delivery areas and fees", method: "GET", path: "/delivery-zone", kind: "list", params: {} },
+    { id: "payments", group: "Optional", name: "Payment methods", purpose: "Cash on delivery and others", method: "GET", path: "/payment-methods", kind: "list", params: {} },
+    { id: "brand", group: "Optional", name: "Brand", purpose: "Store name and logo", method: "GET", path: "/brand", kind: "one", params: {} }
+  ];
+
+  var CHECKS = [
+    { key: "id", label: "Product id", paths: ["id"], need: "Required", level: "required" },
+    { key: "title", label: "Title", paths: ["title", "name"], need: "Required", level: "required" },
+    { key: "price", label: "Price (decimal string)", paths: ["price", "variants[].price"], need: "Required", level: "required", money: true },
+    { key: "currency", label: "Currency", paths: ["currency"], need: "Recommended (the store also sets one)", level: "recommended" },
+    { key: "image", label: "Image", paths: ["image", "imageUrl", "images[].src", "images[]"], need: "Recommended", level: "recommended" },
+    { label: "Variants", paths: ["variants[]"], need: "Required if products have options", level: "recommended" },
+    { key: "stock", label: "Stock", paths: ["stock", "quantity", "inventory_quantity", "variants[].stock", "variants[].inventory_quantity"], need: "Required for live stock", level: "required" },
+    { key: "updated", label: "Updated at (ISO date)", paths: ["updated_at"], need: "Required for sync", level: "required", iso: true }
+  ];
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function isObj(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
+  function typeOf(v) {
+    if (v === null || v === undefined) return "null";
+    if (Array.isArray(v)) return "array";
+    if (typeof v === "object") return "object";
+    if (typeof v === "number") return "number";
+    if (typeof v === "boolean") return "boolean";
+    if (MONEY.test(v)) return "decimal string";
+    if (ISO.test(v)) return "ISO date";
+    return "string";
+  }
+  function short(v) {
+    var s = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
+    return s.length > 70 ? s.slice(0, 70) + "…" : s;
+  }
+
+  function extractList(body) {
+    if (Array.isArray(body)) return { list: body, key: "(top-level array)" };
+    if (isObj(body)) {
+      for (var i = 0; i < LISTKEYS.length; i++) {
+        if (Array.isArray(body[LISTKEYS[i]])) return { list: body[LISTKEYS[i]], key: LISTKEYS[i] };
+      }
+      for (var k in body) { if (Array.isArray(body[k])) return { list: body[k], key: k }; }
+    }
+    return null;
+  }
+  function extractOne(body) {
+    if (!isObj(body)) return null;
+    if (isObj(body.product)) return body.product;
+    if (isObj(body.data)) return body.data;
+    return body;
+  }
+
+  function fieldMap(records) {
+    var map = {};
+    function add(path, v, seen) {
+      if (seen.has(path)) return;
+      seen.add(path);
+      var m = map[path] || (map[path] = { count: 0, types: {}, sample: undefined });
+      m.count++;
+      m.types[typeOf(v)] = true;
+      if (m.sample === undefined && v !== null && v !== undefined) m.sample = v;
+    }
+    records.forEach(function (rec) {
+      if (!isObj(rec)) return;
+      var seen = new Set();
+      Object.keys(rec).forEach(function (k) {
+        var v = rec[k];
+        if (Array.isArray(v) && v.length && isObj(v[0])) {
+          add(k + "[]", v, seen);
+          v.forEach(function (item) {
+            if (isObj(item)) Object.keys(item).forEach(function (sub) { add(k + "[]." + sub, item[sub], seen); });
+          });
+        } else if (isObj(v)) {
+          add(k, v, seen);
+          Object.keys(v).forEach(function (sub) { add(k + "." + sub, v[sub], seen); });
+        } else {
+          add(k, v, seen);
+        }
+      });
+    });
+    return map;
+  }
+
+  function findPath(map, paths) {
+    for (var i = 0; i < paths.length; i++) { if (map[paths[i]]) return paths[i]; }
+    return null;
+  }
+
+  function chip(status) {
+    var label = { pass: "Responded", warn: "Needs attention", fail: "Error", skip: "Not tested" }[status];
+    return '<span class="chip s-' + status + '">' + label + "</span>";
+  }
+
+  function rowEl(r) { return document.querySelector('[data-row="' + r.id + '"]'); }
+
+  function buildRows() {
+    var html = "";
+    var lastGroup = "";
+    ROWS.forEach(function (r) {
+      if (r.group !== lastGroup) {
+        html += '<div class="group-label" style="margin-top:14px">' + esc(r.group) + "</div>";
+        lastGroup = r.group;
+      }
+      var params = Object.keys(r.params).length
+        ? '<div class="params">' + Object.keys(r.params).map(function (p) {
+            return '<div class="field"><label for="p-' + r.id + "-" + p + '">:' + esc(p) + '</label><input type="text" id="p-' + r.id + "-" + p + '" data-param="' + esc(p) + '" value="' + esc(r.params[p]) + '" autocomplete="off"></div>';
+          }).join("") + "</div>"
+        : "";
+      html += '<div class="ep" data-row="' + r.id + '"' + (r.context ? ' data-context="1"' : '') + '>' +
+        '<div><div class="name">' + esc(r.name) + '</div><div class="purpose">' + esc(r.purpose) + "</div></div>" +
+        '<div><div class="pathline"><span class="method">' + r.method + '</span><input type="text" data-path value="' + esc(r.path) + '" aria-label="Path for ' + esc(r.name) + '" autocomplete="off"></div>' +
+        params +
+        '<div class="row-actions"><button type="button" class="plain" data-test>Test</button></div>' +
+        '<div class="result" data-result></div></div>' +
+        '<div class="ep-status"><span data-chip>' + chip("skip") + "</span></div>" +
+        "</div>";
+    });
+    html += '<div class="group-label" style="margin-top:14px">Optional: turns on more actions</div>' +
+      '<div class="ep"><div><div class="name">Cart price check</div><div class="purpose">Cart and coupons</div></div>' +
+      '<div><div class="pathline"><span class="method" style="color:var(--fail)">POST</span><input type="text" value="/cart/quote" disabled></div><div class="hint" style="margin-top:6px">Not tested here: it needs a signed-in customer.</div></div>' +
+      '<div class="ep-status"><b class="miss">Not tested</b>Endpoint needs a signed-in customer</div></div>';
+    $("rows").innerHTML = html;
+    document.querySelectorAll("[data-test]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.closest("[data-row]").getAttribute("data-row");
+        runOne(ROWS.filter(function (r) { return r.id === id; })[0]);
+      });
+    });
+  }
+
+  function authHeaders() {
+    var mode = $("auth").value;
+    var key = $("key").value.trim();
+    var h = { Accept: "application/json" };
+    if (mode === "key" && key) h[$("header").value.trim() || "X-API-Key"] = key;
+    if (mode === "bearer" && key) h.Authorization = "Bearer " + key;
+    return h;
+  }
+
+  function get(url) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 15000);
+    var t0 = performance.now();
+    return fetch(url, { headers: authHeaders(), signal: ctrl.signal, cache: "no-store" })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          var body = null;
+          try { body = text ? JSON.parse(text) : null; } catch (e) { body = null; }
+          return { ok: true, http: r.status, ms: Math.round(performance.now() - t0), body: body, text: text, isJson: body !== null };
+        });
+      })
+      .catch(function (e) {
+        return { ok: false, ms: Math.round(performance.now() - t0), error: e && e.name === "AbortError" ? "Timed out after 15 seconds." : "Network error. The request did not reach the store, or the browser blocked it." };
+      })
+      .finally(function () { clearTimeout(timer); });
+  }
+
+  function buildUrl(r, row, pageOverride) {
+    var path = row.querySelector("[data-path]").value.trim();
+    if (!path) return { error: "Enter a path." };
+    var names = (path.match(/:(\w+)/g) || []).map(function (s) { return s.slice(1); });
+    var values = {};
+    var missing = [];
+    names.forEach(function (n) {
+      var input = row.querySelector('[data-param="' + n + '"]');
+      var v = input ? input.value.trim() : "";
+      if (n === "page") v = pageOverride != null ? String(pageOverride) : (v || "1");
+      if (n === "id" && !v) v = state.products[0] ? String(state.products[0].id) : "";
+      if (!v) missing.push(n);
+      values[n] = v;
+    });
+    if (missing.length) return { error: "Fill in " + missing.map(function (m) { return ":" + m; }).join(", ") + " first." };
+    var base = $("base").value.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\/[^\s/]+/.test(base)) return { error: "Enter the base URL first." };
+    var filled = path.replace(/:(\w+)/g, function (_, n) { return encodeURIComponent(values[n]); });
+    var extra = "";
+    if (row.hasAttribute("data-context") && state.ctxName && state.ctxValue) {
+      extra = (filled.indexOf("?") >= 0 ? "&" : "?") + encodeURIComponent(state.ctxName) + "=" + encodeURIComponent(state.ctxValue);
+    }
+    return { url: base + filled + extra, path: filled + extra };
+  }
+
+  async function callRow(r, row, pageOverride) {
+    var built = buildUrl(r, row, pageOverride);
+    if (built.error) return { status: "skip", message: built.error };
+    var res = await get(built.url);
+    var out = { status: "pass", url: built.url, ms: res.ms, http: res.http, raw: res.text || "", records: null, listKey: null, message: "" };
+    if (!res.ok) { out.status = "fail"; out.message = res.error; out.http = null; return out; }
+    if (res.http === 401 || res.http === 403) { out.status = "warn"; out.message = "HTTP " + res.http + ": the store needs sign-in or a key for this endpoint, and it was not accepted."; return out; }
+    if (res.http === 404) { out.status = "fail"; out.message = "HTTP 404: this endpoint doesn't exist on the store. Check the path."; return out; }
+    if (res.http >= 500) { out.status = "fail"; out.message = "HTTP " + res.http + ": the store had a server error."; return out; }
+    if (res.http !== 200) { out.status = "fail"; out.message = "HTTP " + res.http + ": expected 200."; return out; }
+    if (!res.isJson) { out.status = "fail"; out.message = "HTTP 200, but the body is not JSON. The path probably points at a web page."; return out; }
+    if (r.kind === "list") {
+      var found = extractList(res.body);
+      if (!found) { out.status = "warn"; out.message = "Responded, but no list was found. Top-level keys: " + (isObj(res.body) ? Object.keys(res.body).join(", ") : "none") + "."; return out; }
+      out.records = found.list; out.listKey = found.key;
+      out.message = found.list.length + " record(s) in \"" + found.key + "\".";
+      if (found.list.length === 0) { out.status = "warn"; out.message = "Responded with an empty list (\"" + found.key + "\")."; }
+    } else {
+      var one = extractOne(res.body);
+      out.records = one ? [one] : [];
+      out.message = one ? "One record returned." : "Responded, but the body is not an object.";
+      if (!one) out.status = "warn";
+    }
+    return out;
+  }
+
+  function renderRow(r, res) {
+    var row = rowEl(r);
+    row.querySelector("[data-chip]").innerHTML = chip(res.status);
+    var box = row.querySelector("[data-result]");
+    var meta = [];
+    if (res.http != null) meta.push("HTTP " + res.http);
+    if (res.ms != null) meta.push(res.ms + " ms");
+    if (res.url) meta.push(res.url);
+    var fields = "";
+    if (res.records && res.records.length) {
+      var map = fieldMap(res.records);
+      var keys = Object.keys(map).sort();
+      fields = '<details><summary>Show ' + keys.length + " fields from " + res.records.length + " record(s)</summary>" +
+        '<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Field</th><th>Type</th><th>Found in</th><th>Sample</th></tr></thead><tbody>' +
+        keys.slice(0, 120).map(function (k) {
+          var m = map[k];
+          return '<tr><td class="mono">' + esc(k) + "</td><td>" + esc(Object.keys(m.types).join(" / ")) + "</td><td>" + m.count + " of " + res.records.length + '</td><td class="val mono">' + esc(m.sample === undefined ? "" : short(m.sample)) + "</td></tr>";
+        }).join("") + "</tbody></table></div></details>";
+    }
+    var raw = res.raw ? '<details><summary>Show response</summary><pre>' + esc(res.raw.slice(0, 5000)) + "</pre></details>" : "";
+    box.innerHTML = (res.message ? "<div>" + esc(res.message) + "</div>" : "") +
+      (meta.length ? '<div class="meta">' + esc(meta.join(" · ")) + "</div>" : "") + fields + raw;
+  }
+
+  async function runOne(r) {
+    var row = rowEl(r);
+    var btn = row.querySelector("[data-test]");
+    btn.disabled = true;
+    var res;
+    if (r.id === "products") res = await readAllProductPages();
+    else res = await callRow(r, row);
+    state.rowResults[r.id] = res;
+    if (r.id === "products" && res.records) {
+      state.products = res.records;
+      var firstDetail = rowEl(ROWS[1]).querySelector("[data-param=\"id\"]");
+      if (firstDetail && !firstDetail.value && res.records[0] && res.records[0].id != null) {
+        firstDetail.placeholder = "first product: " + res.records[0].id;
+      }
+    }
+    renderRow(r, res);
+    btn.disabled = false;
+    updateSummary();
+    if (r.id === "products") renderProducts();
+    if (r.id === "products" || r.id === "zones") state.suggested = { product: false, variant: false, zone: false };
+    renderMap();
+    return res;
+  }
+
+  async function readAllProductPages() {
+    var r = ROWS[0];
+    var row = rowEl(r);
+    var max = Math.max(1, Math.min(50, parseInt($("pages").value, 10) || 1));
+    var all = [];
+    var first = null;
+    var lastKey = null;
+    var lastRes = null;
+    var p;
+    for (p = 1; p <= max; p++) {
+      setProgress("Reading product page " + p + " of up to " + max + "…");
+      var res = await callRow(r, row, p);
+      lastRes = res;
+      if (p === 1) first = res;
+      if (res.status === "skip" || res.status === "fail" || !res.records) break;
+      lastKey = res.listKey;
+      if (res.records.length === 0) break;
+      all = all.concat(res.records);
+    }
+    state.pageCount = p - 1;
+    setProgress("");
+    if (!first || !first.records) return first || lastRes;
+    var out = Object.assign({}, first);
+    out.records = all;
+    out.listKey = lastKey || first.listKey;
+    out.message = all.length + " product(s) across " + state.pageCount + " page(s) in \"" + out.listKey + "\".";
+    if (all.length === 0) {
+      out.status = "warn";
+      out.message = state.ctxValue
+        ? "Responded, but no products came back for " + state.ctxName + "=" + state.ctxValue + ". Try another zone or outlet, or open Show response."
+        : "No products came back, and no zone or outlet was sent. Pick a zone or outlet in Delivery setup, then test again.";
+    } else {
+      out.status = "pass";
+    }
+    if (all.length === 0 && first.records && first.records.length === 0) out.raw = first.raw;
+    return out;
+  }
+
+  function setProgress(t) { $("productSummary").textContent = t; }
+
+  function setRunning(on) {
+    document.querySelectorAll(".runAll").forEach(function (b) { b.disabled = on; });
+  }
+
+  // The catalog covers every zone, so the product sample only needs one zone to read from.
+  // If none is chosen, the first zone from the store's list is used for the sample.
+  async function ensureSampleZone() {
+    if (state.ctxValue || !state.ctxName) return;
+    var base = $("base").value.trim().replace(/\/+$/, "");
+    var res = await get(base + "/delivery-zone");
+    if (!res.ok || res.http !== 200 || !res.isJson) return;
+    var found = extractList(res.body);
+    if (!found || !found.list.length) return;
+    var z = found.list.filter(isObj)[0];
+    var zid = pick(z, "zone", "zid");
+    var id = zid != null && zid !== "" ? zid : (z.id != null ? z.id : z.code);
+    if (id == null) return;
+    state.ctxValue = String(id);
+    $("ctxValue").value = state.ctxValue;
+    $("zoneStatus").textContent = "Sample read from zone " + state.ctxValue + ". The catalog sync covers every zone.";
+  }
+
+  async function testAll() {
+    setRunning(true);
+    // The zone parameter name comes from discovery for this store; it isn't assumed.
+    if (!state.ctxName) await findZoneParam();
+    await ensureSampleZone();
+    state.rowResults = {};
+    state.products = [];
+    for (var i = 0; i < ROWS.length; i++) {
+      var r = ROWS[i];
+      if (r.id === "detail" && !state.products.length) {
+        var skip = { status: "skip", message: "Skipped: no product to look up. Product list must return products first." };
+        state.rowResults.detail = skip;
+        renderRow(r, skip);
+        rowEl(r).querySelector("[data-chip]").innerHTML = chip("skip");
+        continue;
+      }
+      await runOne(r);
+    }
+    setRunning(false);
+  }
+
+  var TONE = { pass: ["✓", "Passed"], warn: ["!", "Needs attention"], fail: ["✕", "Failed"], skip: ["–", "Not tested"] };
+
+  function crow(tone, title, desc, badgeText) {
+    return '<div class="crow"><span class="ico ico-' + tone + '">' + TONE[tone][0] + '</span>' +
+      '<div class="crow-body"><div class="crow-title">' + esc(title) + '</div><div class="hint">' + esc(desc) + "</div></div>" +
+      '<span class="badge b-' + tone + '">' + esc(badgeText || TONE[tone][1]) + "</span></div>";
+  }
+
+  function endpointRow(title, id, okText) {
+    var x = state.rowResults[id];
+    if (!x) return crow("skip", title, "Not run yet. Run the tests first.");
+    var tone = x.status === "pass" ? "pass" : x.status === "warn" ? "warn" : x.status === "fail" ? "fail" : "skip";
+    return crow(tone, title, x.status === "pass" ? okText : (x.message || ""));
+  }
+
+  function renderTestPanel() {
+    var el = $("testPanel");
+    if (!el) return;
+    var res = state.rowResults;
+    var pr = res.products;
+    var base = $("base").value.trim();
+    var connected = !!(pr && pr.status === "pass" && state.products.length);
+    var host = base;
+    try { host = new URL(base).host; } catch (e) { /* keep raw text */ }
+    var brandRec = res.brand && res.brand.records && res.brand.records[0];
+    var storeName = brandRec ? textOf(brandRec.name || brandRec.title || brandRec.brand) : "";
+    var runBtn = '<button type="button" id="runAgain" style="background:#1c8274;color:#fff">Run test again</button>';
+    var banner;
+    if (connected) {
+      banner = '<div class="banner ok"><span class="ico ico-pass big">✓</span>' +
+        '<div class="banner-body"><div class="sec-title">Connected to ' + esc(storeName || host) + '</div><div class="hint mono">' + esc(base) + "</div></div>" + runBtn + "</div>";
+    } else if (!pr) {
+      banner = '<div class="banner"><span class="ico ico-skip big">–</span>' +
+        '<div class="banner-body"><div class="sec-title">Not tested yet</div><div class="hint">Run the tests to check the connection.</div></div>' + runBtn + "</div>";
+    } else {
+      banner = '<div class="banner warn"><span class="ico ico-warn big">!</span>' +
+        '<div class="banner-body"><div class="sec-title">Not connected yet</div><div class="hint">Products are not coming through. Check the base URL and sign-in in step 1, then run the tests again.</div></div>' + runBtn + "</div>";
+    }
+
+    var list = [
+      ["Store profile", "brand", "Brand read from the store."],
+      ["Catalog", "products", state.products.length + " product(s) read with variants and images where present."],
+      ["Product search", "search", "Search returned matching products."],
+      ["Live stock and price", "detail", "Stock and price returned for a product."],
+      ["Order lookup", "orders", "The order list endpoint responded."],
+      ["Order details", "order", "Status, items and tracking returned."]
+    ];
+    var tally = { pass: 0, warn: 0, fail: 0, skip: 0 };
+    list.forEach(function (x) { var r = res[x[1]]; tally[r ? r.status : "skip"]++; });
+    tally.skip += 2;
+    var rowsHtml = list.map(function (x) { return endpointRow(x[0], x[1], x[2]); }).join("") +
+      crow("skip", "Cart quote", "Not tested here. Cart, coupons and checkout in chat stay off until this endpoint is added.") +
+      crow("skip", "Cancel order and update order", "Not tested here. These change orders, so the tester does not call them.");
+    var counts = tally.pass + " passed · " + (tally.warn + tally.fail) + " needs attention · " + tally.skip + " not tested";
+
+    var recs = state.products;
+    var dq;
+    if (!recs.length) {
+      dq = '<p class="hint">Run the tests to check the data quality.</p>';
+    } else {
+      var mapped = recs.map(mapProduct);
+      var priceOk = mapped.filter(function (m) { return m.price != null && MONEY.test(String(m.price)); }).length;
+      var stockMissing = mapped.filter(function (m) { return m.stock === null; }).length;
+      var withVariantStock = mapped.filter(function (m) { return m.variants.some(function (v) { return v.stock !== null; }); }).length;
+      var withImage = mapped.filter(function (m) { return m.image != null && m.image !== ""; }).length;
+      var q = [];
+      q.push(priceOk === recs.length
+        ? crow("pass", "Prices are numbers", "All " + recs.length + " products have a usable price.")
+        : crow("warn", "Prices are missing or not numbers", (recs.length - priceOk) + " product(s) have no usable price."));
+      q.push(stockMissing
+        ? crow("warn", "Stock is missing on " + stockMissing + " product(s)", "The AI will say \"check availability\" for these.")
+        : crow("pass", "Stock found on every product", "Every product has a stock figure."));
+      q.push(withVariantStock
+        ? crow("pass", "Variants have their own stock", "Stock found on variants of " + withVariantStock + " product(s).")
+        : crow("skip", "Variant stock", "No variant stock was sent."));
+      q.push(withImage === recs.length
+        ? crow("pass", "Images load", "Every product has at least one image.")
+        : crow("warn", "Some products have no image", withImage + " of " + recs.length + " have at least one image."));
+      q.push(pr && pr.status === "pass"
+        ? crow("pass", "All pages load", "Pages 1 to " + (state.pageCount || 1) + " read without errors.")
+        : crow("warn", "Not all pages read", "Check the product list in step 1."));
+      var ms = res.detail && res.detail.ms;
+      if (ms != null) {
+        q.push(ms <= 1000
+          ? crow("pass", "Live stock check speed", "One product read took " + ms + " ms.")
+          : crow("warn", "Live stock check is slow", "One product read took " + ms + " ms. Customers will see \"checking with the store…\". Aim for under 1 s."));
+      }
+      dq = q.join("");
+    }
+
+    var sample = recs.slice(0, 3).map(function (p) {
+      var m = mapProduct(p);
+      var name = textOf(m.title) || String(m.id);
+      var priceCell = m.price != null ? "৳ " + esc(m.price) : '<span class="miss">not sent</span>';
+      var was = m.compare_at_price != null ? ' <span style="text-decoration:line-through;color:var(--muted2)">৳ ' + esc(m.compare_at_price) + "</span>" : "";
+      var opts = m.variants.map(function (v) { return textOf(v.title); }).filter(Boolean).join(" · ") || "None";
+      var st = m.stock === null ? ["warn", "Stock not sent"] : m.stock > 0 ? ["pass", "In stock"] : ["fail", "Out of stock"];
+      return "<tr><td><strong>" + esc(name) + '</strong></td><td class="mono">' + priceCell + was + "</td><td>" + esc(opts) +
+        '</td><td><span class="badge b-' + st[0] + '">' + esc(st[1]) + "</span></td></tr>";
+    }).join("");
+
+    var first = recs[0];
+    var fields = first ? MAP_DEFS.product.map(function (d) {
+      var b = rowBadge("product", d, first);
+      if (b[0] === "pass") return '<span class="badge b-pass">✓ ' + esc(d.label) + "</span>";
+      if (b[0] === "skip") return '<span class="badge b-skip">' + esc(d.label) + " (optional)</span>";
+      return '<span class="badge b-warn">! ' + esc(d.label) + (d.level === "optional" ? " (optional)" : "") + "</span>";
+    }).join(" ") : "";
+
+    el.innerHTML = banner +
+      '<div class="card"><div class="card-head"><div><div class="sec-title">Test results</div><div class="hint" style="margin-top:4px">' + esc(counts) + "</div></div></div>" +
+        rowsHtml + "</div>" +
+      '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
+        '<div class="hint" style="margin-top:4px">An endpoint can answer and still send data the AI can\'t use well. These checks catch that before customers do.</div></div>' +
+        (recs.length ? '<span class="badge b-skip">Checked on ' + recs.length + " product(s)</span>" : "") + "</div>" +
+        dq + "</div>" +
+      '<div class="card"><div><div class="sec-title">Sample products from your API</div>' +
+        '<div class="hint" style="margin-top:4px">Check these look right. This is how the AI Agent and the inbox will see your products.</div></div>' +
+        (recs.length
+          ? '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Price</th><th>Variants</th><th>Stock</th></tr></thead><tbody>' + sample + "</tbody></table></div>" +
+            '<div class="fields-wrap"><strong>Fields Chattrn understood</strong><div class="fields-list">' + fields + "</div></div>"
+          : '<p class="hint">No products read yet.</p>') +
+      "</div>";
+  }
+
+  function updateSummary() { renderTestPanel(); }
+
+  function recCount(id) { var x = state.rowResults[id]; return x && x.records ? x.records.length : 0; }
+
+  function renderProducts() {
+    var records = state.products;
+    if (!records.length) { $("productData").hidden = true; return; }
+    $("productData").hidden = false;
+    $("productSummary").textContent = records.length + " product(s) read across " + (state.pageCount || 1) + " page(s).";
+    var map = fieldMap(records);
+    var need = CHECKS.map(function (c) {
+      // Use the field picked in Map fields, so this table agrees with the test results.
+      var mk = c.key ? getMapped("product", c.key) : null;
+      var path, found, sample = "";
+      if (mk && (mk.primary || mk.fallback)) {
+        path = mk.primary || mk.fallback;
+        found = 0;
+        records.forEach(function (rec) {
+          var x = pick(rec, "product", c.key);
+          if (x !== undefined && x !== null && x !== "") { found++; if (sample === "") sample = short(x); }
+        });
+      } else {
+        path = findPath(map, c.paths);
+        found = path ? map[path].count : 0;
+        sample = path && map[path].sample !== undefined ? short(map[path].sample) : "";
+      }
+      var status;
+      if (!path) status = c.level === "required" ? "fail" : "warn";
+      else if (found < records.length) status = "warn";
+      else status = "pass";
+      var cell = status === "pass" ? '<span class="ok">Every product</span>' : status === "warn" ? '<span class="part">' + (path ? found + " of " + records.length : "Not in any product") + "</span>" : '<span class="miss">Missing</span>';
+      var moneyNote = "";
+      if (c.money && path) {
+        var nums = 0;
+        records.forEach(function (rec) { var v = rec[path]; if (typeof v === "number") nums++; });
+        if (nums) moneyNote = " (" + nums + " sent as a number, not a string)";
+      }
+      return "<tr><td>" + esc(c.label) + "</td><td>" + esc(c.need) + "</td><td>" + cell + (path ? '<div class="hint mono">' + esc(path) + esc(moneyNote) + "</div>" : "") + '</td><td class="val mono">' + esc(sample) + "</td></tr>";
+    }).join("");
+    $("needTable").innerHTML = need;
+    var keys = Object.keys(map).sort();
+    $("fieldTable").innerHTML = keys.slice(0, 200).map(function (k) {
+      var m = map[k];
+      var cls = m.count === records.length ? "ok" : "part";
+      return '<tr><td class="mono">' + esc(k) + "</td><td>" + esc(Object.keys(m.types).join(" / ")) + '</td><td><span class="' + cls + '">' + m.count + " of " + records.length + '</span></td><td class="val mono">' + esc(m.sample === undefined ? "" : short(m.sample)) + "</td></tr>";
+    }).join("");
+    $("copy").hidden = false;
+  }
+
+  var STOP = ("what is the of in for a an and or do you have there me tell about from to at on can i it which how much " +
+    "quantity stock available availability price cost this that its be get does any are when where also please show check " +
+    "product products item items is it's how many left").split(" ");
+
+  function zoneFromQuestion(q) {
+    var m = q.match(/\b(?:zone|area|outlet)\s*([\w-]+)/i);
+    return m ? m[1] : "";
+  }
+
+  function questionWords(q) {
+    var cleaned = q.replace(/\b(?:zone|area|outlet)\s*[\w-]+/ig, " ").toLowerCase();
+    return cleaned.split(/[\s,.?!;:()\/"'`]+/).filter(function (w) {
+      return w.length >= 2 && STOP.indexOf(w) < 0;
+    });
+  }
+
+  function haystack(p) {
+    var variants = Array.isArray(p.variants) ? p.variants : [];
+    var parts = [p.title, p.name, p.vendor, p.brand, p.product_type, p.category,
+      Array.isArray(p.tags) ? p.tags.join(" ") : p.tags];
+    variants.forEach(function (v) {
+      if (isObj(v)) parts.push([v.title, v.sku, v.option1, v.option2, v.option3].join(" "));
+    });
+    return parts.filter(Boolean).join(" ").toLowerCase();
+  }
+
+  function rawBox(t) {
+    return t ? '<details><summary>Show response</summary><pre>' + esc(String(t).slice(0, 5000)) + "</pre></details>" : "";
+  }
+
+  function askBox(html) { $("askAnswer").innerHTML = html; }
+
+  var CHIP = {
+    avail: ["pass", "Available"],
+    out: ["fail", "Out of stock"],
+    unknown: ["warn", "Stock not sent"],
+    nozone: ["warn", "Not in this zone"],
+    error: ["fail", "Error"]
+  };
+
+  function textOf(v) {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") return String(v.name || v.title || v.value || "");
+    return String(v);
+  }
+
+  function resolveZone(value) {
+    if (!value) return "";
+    var recs = recordsFor("zone");
+    if (!recs.length) return value;
+    var ids = recs.map(function (z) { return String(pick(z, "zone", "zid")); });
+    if (ids.indexOf(value) >= 0) return value;
+    var lower = value.toLowerCase();
+    for (var i = 0; i < recs.length; i++) {
+      var n = String(pick(recs[i], "zone", "zname") || "").toLowerCase();
+      if (n && (n === lower || n.indexOf(lower) >= 0)) return String(pick(recs[i], "zone", "zid"));
+    }
+    return value;
+  }
+
+  // Reads one product for the zone using the field mapping, and returns its card HTML and status.
+  async function checkOne(p, zone, zName) {
+    var base = $("base").value.trim().replace(/\/+$/, "");
+    var url = base + "/products/" + encodeURIComponent(p.id) +
+      (zone ? "?" + encodeURIComponent(zName) + "=" + encodeURIComponent(zone) : "");
+    var title = p.title || p.name || String(p.id);
+    var res = await get(url);
+    var status;
+    var body = "";
+    var m = null;
+    var det = {};
+    if (!res.ok) { status = "error"; body = "<div>" + esc(res.error) + "</div>"; }
+    else if (res.http === 404) {
+      status = "nozone";
+      body = "<div>" + (zone ? "This product is not returned for " + esc(zName + " = " + zone) + " (HTTP 404)." : "HTTP 404 for this product.") + "</div>";
+    }
+    else if (res.http !== 200 || !res.isJson) { status = "error"; body = "<div>HTTP " + res.http + ": could not read this product.</div>"; }
+    else {
+      det = extractOne(res.body) || {};
+      m = mapProduct(det);
+      var variants = m.variants;
+      var flagKey = null;
+      ["instock", "in_stock", "isavailable", "available"].forEach(function (k) {
+        if (flagKey === null && typeof det[k] === "boolean") flagKey = k;
+      });
+      var flag = flagKey ? det[flagKey] : null;
+      var total = m.stock;
+      if (total !== null) status = total > 0 ? "avail" : "out";
+      else if (flag !== null) status = flag ? "avail" : "out";
+      else status = "unknown";
+
+      var priceText = "";
+      if (m.price != null) priceText = m.price + (m.currency ? " " + textOf(m.currency) : "");
+      else {
+        var nums = variants.map(function (v) { return parseFloat(v.price); }).filter(function (x) { return !isNaN(x); });
+        if (nums.length) {
+          var lo = Math.min.apply(null, nums), hi = Math.max.apply(null, nums);
+          priceText = (lo === hi ? lo.toFixed(2) : lo.toFixed(2) + " to " + hi.toFixed(2)) + (m.currency ? " " + textOf(m.currency) : "");
+        }
+      }
+
+      var stockText;
+      if (total !== null) {
+        stockText = "<strong>" + esc(total) + "</strong> available" +
+          (variants.length > 1 ? " (" + variants.filter(function (v) { return v.stock !== null && v.stock > 0; }).length + " of " + variants.length + " variants in stock)" : "");
+      } else if (flag !== null) {
+        stockText = flag ? "<strong>In stock</strong> (quantity not sent, only the yes/no flag " + esc(flagKey) + ")" : "Out of stock (" + esc(flagKey) + " is false)";
+      } else {
+        stockText = '<span class="miss">not in the response</span>';
+      }
+
+      var pf = getMapped("product", "price");
+      var sf = getMapped("product", "stock");
+      var mapNote = "Price from " + (pf.primary ? esc(pf.primary) : '<span class="miss">not mapped</span>') +
+        " · Stock from " + (sf.primary ? esc(sf.primary) : '<span class="miss">not mapped</span>');
+
+      body = "<div>Price: " + (priceText ? "<strong>" + esc(priceText) + "</strong>" : '<span class="miss">not in the response</span>') + "</div>" +
+        "<div>Available: " + stockText + "</div>" +
+        '<div class="hint">' + mapNote + "</div>";
+      if (variants.length) {
+        body += '<div class="table-wrap" style="margin-top:6px"><table><thead><tr><th>Variant</th><th>Price</th><th>Available</th></tr></thead><tbody>' +
+          variants.map(function (v) {
+            return "<tr><td>" + esc(textOf(v.title) || v.sku || v.id) + '</td><td class="mono">' + esc(v.price != null ? v.price : "") +
+              '</td><td class="mono">' + esc(v.stock != null ? v.stock : "not sent") + "</td></tr>";
+          }).join("") + "</tbody></table></div>";
+      }
+    }
+    var chipInfo = CHIP[status];
+    var brand = m ? textOf(m.vendor) : textOf(det.vendor || det.brand || p.vendor || p.brand);
+    var type = m ? textOf(m.product_type) : textOf(det.product_type || p.product_type);
+    var html = '<article class="card" style="padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start">' +
+      "<div><strong>" + esc(textOf(det.title || det.name) || title) + "</strong>" +
+      (brand || type ? '<div class="hint">' + esc([brand, type].filter(Boolean).join(" · ")) + "</div>" : "") + "</div>" +
+      '<span class="chip s-' + chipInfo[0] + '">' + chipInfo[1] + "</span></div>" +
+      '<div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:13px">' + body + "</div>" +
+      '<div class="meta" style="margin-top:6px">From ' + esc(url) + (res.http != null ? " · HTTP " + res.http : "") + (res.ms != null ? " · " + res.ms + " ms" : "") + "</div>" +
+      rawBox(res.text) + "</article>";
+    return { status: status, html: html };
+  }
+
+  async function askOpen() {
+    var q = $("askText").value.trim();
+    if (!q) { askBox("<div>Type a question first.</div>"); return; }
+    if (!state.products.length) {
+      askBox('<div>No products are loaded yet. Press "Run all tests" first, so the tester has the product list.</div>');
+      return;
+    }
+    var zone = resolveZone($("askZone").value.trim() || zoneFromQuestion(q) || state.ctxValue);
+    var zName = $("ctxName").value.trim();
+    var words = questionWords(q);
+    var scored = state.products.map(function (p) {
+      var h = haystack(p);
+      var s = words.filter(function (w) { return h.indexOf(w) >= 0; }).length;
+      return { p: p, s: s };
+    });
+    var cands = words.length
+      ? scored.filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; })
+      : scored;
+    if (!cands.length) {
+      askBox("<div>No loaded product matches the words in your question (" + esc(words.join(", ")) + "). The list has " + state.products.length + " products. Try a different word, like the brand or the type of product.</div>");
+      return;
+    }
+    var shown = cands.slice(0, 12).map(function (x) { return x.p; });
+    var scope = zone ? "for " + zName + " = " + zone : "with no zone sent, so results are store-wide";
+    askBox('<div class="hint" id="askProgress">Checking ' + shown.length + " of " + cands.length + " matching product(s) " + esc(scope) + "…</div>" +
+      '<div id="askCards" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>');
+    var counts = { avail: 0, out: 0, unknown: 0, nozone: 0, error: 0 };
+    for (var i = 0; i < shown.length; i++) {
+      var r = await checkOne(shown[i], zone, zName);
+      counts[r.status]++;
+      $("askCards").insertAdjacentHTML("beforeend", r.html);
+    }
+    var head = shown.length + " of " + cands.length + " matching product(s) checked " + scope + ". " +
+      counts.avail + " available, " + counts.out + " out of stock, " + counts.nozone + " not in this zone, " +
+      counts.unknown + " with no stock figure, " + counts.error + " with an error.";
+    $("askProgress").outerHTML = '<div style="font-weight:600">' + esc(head) + "</div>";
+  }
+
+  // ---- Map the API fields -------------------------------------------------
+  var MAP_DEFS = {
+    product: [
+      { key: "id", label: "Product ID", chattrn: "product.id", level: "required", syn: ["id", "productid", "product_id"] },
+      { key: "title", label: "Title", chattrn: "product.title", level: "required", syn: ["title", "name", "productname"] },
+      { key: "price", label: "Selling price", chattrn: "product.price", level: "required", money: true,
+        syn: ["sellprice", "sellingprice", "saleprice", "discountprice", "price", "currentprice"], fallbackSyn: ["price", "regularprice"] },
+      { key: "compare", label: "Was price", chattrn: "product.compare_at_price", level: "optional", money: true,
+        syn: ["compareprice", "compareatprice", "originalprice", "regularprice", "wasprice"] },
+      { key: "currency", label: "Currency", chattrn: "product.currency", level: "recommended", syn: ["currency", "currencycode"] },
+      { key: "stock", label: "Total stock", chattrn: "product.stock", level: "required",
+        syn: ["totalstock", "inventoryquantity", "quantity", "stock", "available", "stockquantity"] },
+      { key: "image", label: "Image", chattrn: "product.images", level: "recommended", syn: ["images", "image", "imageurl", "thumbnail", "photo"] },
+      { key: "updated", label: "Updated at", chattrn: "product.updated_at", level: "required", iso: true, syn: ["updatedat", "modifiedat", "lastupdated"] },
+      { key: "vendor", label: "Brand / vendor", chattrn: "product.vendor", level: "optional", syn: ["vendor", "brand", "manufacturer"] },
+      { key: "type", label: "Product type", chattrn: "product.product_type", level: "optional", syn: ["producttype", "category", "type"] },
+      { key: "variants", label: "Variants list", chattrn: "product.variants", level: "recommended", syn: ["variants", "variations", "options"] }
+    ],
+    variant: [
+      { key: "vid", label: "Variant ID", chattrn: "variant.id", level: "required", syn: ["id", "variantid"] },
+      { key: "vtitle", label: "Variant title", chattrn: "variant.title", level: "required", syn: ["title", "name", "variantname", "label"] },
+      { key: "vprice", label: "Variant price", chattrn: "variant.price", level: "required", money: true,
+        syn: ["sellprice", "sellingprice", "discountprice", "price"], fallbackSyn: ["price"] },
+      { key: "vcompare", label: "Variant was price", chattrn: "variant.compare_at_price", level: "optional", money: true,
+        syn: ["compareprice", "compareatprice", "originalprice"] },
+      { key: "vstock", label: "Variant stock", chattrn: "variant.inventory_quantity", level: "required",
+        syn: ["stock", "quantity", "available", "inventoryquantity", "totalstock"] },
+      { key: "vsku", label: "SKU", chattrn: "variant.sku", level: "optional", syn: ["sku", "code"] },
+      { key: "vinv", label: "Inventory item ID", chattrn: "variant.inventory_item_id", level: "recommended", syn: ["inventoryitemid", "inventoryid"] }
+    ],
+    zone: [
+      { key: "zid", label: "Zone ID", chattrn: "location.id (sent as the zone parameter)", level: "required", syn: ["zoneid", "zone_id", "id", "code", "areaid"] },
+      { key: "zname", label: "Zone name", chattrn: "location.name", level: "required", syn: ["zonename", "name", "title", "area", "zone"] }
+    ]
+  };
+  var SCOPE_LABEL = { product: "product", variant: "variant", zone: "zone" };
+  state.map = { product: {}, variant: {}, zone: {} };
+  state.suggested = { product: false, variant: false, zone: false };
+
+  function normKey(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+  function recordsFor(scope) {
+    if (scope === "product") return state.products;
+    if (scope === "variant") {
+      return state.products.reduce(function (acc, p) {
+        return acc.concat(Array.isArray(p.variants) ? p.variants.filter(isObj) : []);
+      }, []);
+    }
+    return (state.rowResults.zones && state.rowResults.zones.records) || [];
+  }
+
+  function fieldNames(scope) {
+    var keys = {};
+    recordsFor(scope).forEach(function (r) { if (isObj(r)) Object.keys(r).forEach(function (k) { keys[k] = true; }); });
+    return Object.keys(keys).sort();
+  }
+
+  function getMapped(scope, key) {
+    return (state.map[scope] && state.map[scope][key]) || { primary: "", fallback: "" };
+  }
+
+  function pick(rec, scope, key) {
+    if (!isObj(rec)) return undefined;
+    var m = getMapped(scope, key);
+    var v = m.primary ? rec[m.primary] : undefined;
+    if ((v === undefined || v === null || v === "") && m.fallback) v = rec[m.fallback];
+    if (Array.isArray(v) && (key === "image")) {
+      var first = v[0];
+      return isObj(first) ? (first.src || first.url || first.image || null) : first;
+    }
+    return v;
+  }
+
+  function suggestScope(scope) {
+    var names = fieldNames(scope);
+    var byNorm = {};
+    names.forEach(function (n) { byNorm[normKey(n)] = n; });
+    state.map[scope] = {};
+    MAP_DEFS[scope].forEach(function (d) {
+      var primary = "", fallback = "";
+      d.syn.forEach(function (s) { if (!primary && byNorm[s]) primary = byNorm[s]; });
+      (d.fallbackSyn || []).forEach(function (s) { if (!fallback && byNorm[s] && byNorm[s] !== primary) fallback = byNorm[s]; });
+      state.map[scope][d.key] = { primary: primary, fallback: fallback };
+    });
+    state.suggested[scope] = true;
+  }
+
+  function toMoney(v) {
+    if (typeof v === "number") return v.toFixed(2);
+    if (typeof v === "string") {
+      if (MONEY.test(v)) return v;
+      var digits = v.replace(/[^\d.]/g, "");
+      if (MONEY.test(digits)) return digits;
+    }
+    return v === undefined ? null : v;
+  }
+
+  function toNum(v) {
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v);
+    return null;
+  }
+
+  function mapVariant(v) {
+    return {
+      id: pick(v, "variant", "vid"),
+      title: pick(v, "variant", "vtitle"),
+      price: toMoney(pick(v, "variant", "vprice")),
+      compare_at_price: toMoney(pick(v, "variant", "vcompare")),
+      stock: toNum(pick(v, "variant", "vstock")),
+      sku: pick(v, "variant", "vsku"),
+      inventory_item_id: pick(v, "variant", "vinv")
+    };
+  }
+
+  function mapProduct(p) {
+    var variantsRaw = pick(p, "product", "variants");
+    var variants = Array.isArray(variantsRaw) ? variantsRaw.filter(isObj).map(mapVariant) : [];
+    var stock = toNum(pick(p, "product", "stock"));
+    if (stock === null && variants.length) {
+      var sum = 0, any = false;
+      variants.forEach(function (v) { if (v.stock !== null) { sum += v.stock; any = true; } });
+      if (any) stock = sum;
+    }
+    return {
+      id: pick(p, "product", "id"),
+      title: pick(p, "product", "title"),
+      price: toMoney(pick(p, "product", "price")),
+      compare_at_price: toMoney(pick(p, "product", "compare")),
+      currency: pick(p, "product", "currency"),
+      stock: stock,
+      image: pick(p, "product", "image"),
+      updated_at: pick(p, "product", "updated"),
+      vendor: pick(p, "product", "vendor"),
+      product_type: pick(p, "product", "type"),
+      variants: variants
+    };
+  }
+
+  function missingRequired(scope, mapped) {
+    return MAP_DEFS[scope].filter(function (d) {
+      if (d.level !== "required") return false;
+      var v = mapped[d.key];
+      return v === null || v === undefined || v === "";
+    }).map(function (d) { return d.label; });
+  }
+
+  function sampleOf(rec, scope, key) {
+    var v = pick(rec, scope, key);
+    if (v === undefined || v === null || v === "") return '<span class="hint">(empty)</span>';
+    return '<span class="mono">' + esc(short(Array.isArray(v) ? "(" + v.length + " items)" : v)) + "</span>";
+  }
+
+  function mapStatus(scope, d, rec) {
+    var m = getMapped(scope, d.key);
+    if (!m.primary) {
+      if (d.level === "required") return ["fail", "Not found"];
+      return ["warn", d.level === "optional" ? "Optional, not mapped" : "Not mapped"];
+    }
+    // Judge the mapping by the first sample record that has a value, so one empty product does not flag a good match.
+    var v;
+    recordsFor(scope).some(function (r) {
+      var x = pick(r, scope, d.key);
+      if (x !== undefined && x !== null && x !== "") { v = x; return true; }
+      return false;
+    });
+    if (v === undefined) return ["warn", "Empty in every sample"];
+    // Numbers are fine for money: the backend sends them as text.
+    if (d.money && typeof v === "string" && !MONEY.test(v.trim())) return ["warn", "Not a plain number, will clean"];
+    if (d.iso && !ISO.test(String(v))) return ["warn", "Not an ISO date"];
+    return ["pass", m.fallback ? "Matched, with fallback" : "Matched"];
+  }
+
+  var TABS = [
+    { id: "product", label: "Product" },
+    { id: "variant", label: "Variant" },
+    { id: "order", label: "Order" },
+    { id: "customer", label: "Customer" },
+    { id: "zone", label: "Delivery zone" }
+  ];
+
+  function rowBadge(scope, d, first) {
+    var m = getMapped(scope, d.key);
+    if (!m.primary && d.level === "optional") return ["skip", "Optional"];
+    if (!first) return ["skip", "No data yet"];
+    var st = mapStatus(scope, d, first);
+    if (st[0] === "pass") return ["pass", "Matched"];
+    if (st[0] === "fail") return ["fail", "Not found"];
+    return ["warn", "Check this"];
+  }
+
+  function scopeRows(scope) {
+    var first = recordsFor(scope)[0];
+    return MAP_DEFS[scope].map(function (d) { return { d: d, badge: rowBadge(scope, d, first) }; });
+  }
+
+  function countBadges(rows) {
+    var c = { pass: 0, warn: 0, fail: 0, skip: 0 };
+    rows.forEach(function (r) { c[r.badge[0]]++; });
+    return c;
+  }
+
+  function extraFields() {
+    var used = {};
+    MAP_DEFS.product.forEach(function (d) {
+      var m = getMapped("product", d.key);
+      if (m.primary) used[m.primary] = true;
+      if (m.fallback) used[m.fallback] = true;
+    });
+    return fieldNames("product").filter(function (f) { return !used[f]; }).slice(0, 8);
+  }
+
+  function optSelect(scope, key, slot, selected) {
+    var opts = fieldNames(scope);
+    return '<select data-scope="' + scope + '" data-key="' + key + '" data-slot="' + slot + '" aria-label="' + esc(slot) + ' field for ' + esc(key) + '">' +
+      '<option value="">No match</option>' +
+      opts.map(function (o) {
+        return '<option value="' + esc(o) + '"' + (o === selected ? " selected" : "") + ">" + esc(o) + "</option>";
+      }).join("") + "</select>";
+  }
+
+  function mapRowHtml(scope, r, first) {
+    var d = r.d;
+    var m = getMapped(scope, d.key);
+    var fb = d.fallbackSyn ? '<div class="hint" style="margin:6px 0 4px">else</div>' + optSelect(scope, d.key, "fallback", m.fallback) : "";
+    var check = r.badge[0] === "warn" || r.badge[0] === "fail";
+    return '<div class="mrow' + (check ? " mrow-check" : "") + '">' +
+      '<div><div class="mname">' + esc(d.label) + '</div><span class="mtag">' + esc(d.chattrn) + "</span></div>" +
+      "<div>" + optSelect(scope, d.key, "primary", m.primary) + fb + "</div>" +
+      '<div class="mono">' + sampleOf(first, scope, d.key) + "</div>" +
+      '<div><span class="badge b-' + r.badge[0] + '">' + esc(r.badge[1]) + "</span></div></div>";
+  }
+
+  function mapTableHtml(scope) {
+    var first = recordsFor(scope)[0];
+    if (!first) {
+      return '<p class="hint" style="padding:16px">No ' + SCOPE_LABEL[scope] + ' records yet. Run "Test all endpoints" on step 1 first, so the fields can be read.</p>';
+    }
+    return '<div class="mtable-scroll"><div class="mtable">' +
+      '<div class="mhead"><div>Chattrn field</div><div>Your field</div><div>Sample value</div><div>Match</div></div>' +
+      scopeRows(scope).map(function (r) { return mapRowHtml(scope, r, first); }).join("") +
+      "</div></div>";
+  }
+
+  function tabPane(scope) {
+    if (scope === "order") {
+      var o = state.rowResults.orders;
+      var msg = !o ? "Run Test all endpoints on step 1 first."
+        : o.status === "pass" ? "Orders responded. Order mapping isn't built in this tester yet."
+        : "Orders need a key that can read orders. Fix the key in Your API, then run the test again.";
+      return '<p class="hint" style="padding:16px">' + esc(msg) + "</p>";
+    }
+    if (scope === "customer") {
+      return '<p class="hint" style="padding:16px">Customer mapping isn\'t built in this tester yet.</p>';
+    }
+    var hint = scope === "product"
+      ? "Pick which store field fills each Chattrn product field. Highlighted rows need a check."
+      : scope === "variant"
+        ? "Variants come from each product's variants list. Map the price, stock and ID for each variant."
+        : "Zones come from /delivery-zone. Map the ID that goes in the zone parameter, and the zone name.";
+    return '<p class="hint" style="padding:12px 16px 0">' + esc(hint) + "</p>" + mapTableHtml(scope);
+  }
+
+  function renderMap() {
+    ["product", "variant", "zone"].forEach(function (s) {
+      if (!state.suggested[s] && recordsFor(s).length) suggestScope(s);
+    });
+    var hasData = state.products.length > 0;
+    var pc = countBadges(scopeRows("product"));
+    var vc = countBadges(scopeRows("variant"));
+    var extras = hasData ? extraFields() : [];
+    var oStatus = state.rowResults.orders ? state.rowResults.orders.status : null;
+    var counts = {
+      product: pc.warn + pc.fail,
+      variant: vc.warn + vc.fail,
+      order: oStatus === "warn" || oStatus === "fail" ? 1 : 0,
+      customer: 0,
+      zone: countBadges(scopeRows("zone")).warn
+    };
+
+    var summary = hasData
+      ? '<p class="hint">Based on ' + state.products.length + " sample product(s) from your API. Check the highlighted rows in each tab, then save. You can change any match.</p>" +
+        '<div class="badges"><span class="badge b-pass">' + pc.pass + ' matched</span><span class="badge b-warn">' + (pc.warn + pc.fail) + ' to check</span>' +
+        '<span class="badge b-skip">' + pc.skip + ' not found (optional)</span><span class="badge b-info">' + extras.length + ' extra fields</span></div>'
+      : '<p class="hint">Run "Test all endpoints" on step 1 first, so sample products can be read.</p>';
+
+    var tabs = TABS.map(function (t) {
+      var sel = state.tab === t.id;
+      var warnTag = t.id === "order" && oStatus && oStatus !== "pass"
+        ? ' <span style="color:#9937ab;font-size:12px;font-weight:400">· fix key first</span>' : "";
+      return '<button type="button" data-tab="' + t.id + '" aria-selected="' + sel + '">' + esc(t.label) +
+        (counts[t.id] ? ' <span class="count">' + counts[t.id] + "</span>" : "") + warnTag + "</button>";
+    }).join("");
+
+    var extraHtml = extras.length
+      ? extras.map(function (f) {
+          var v = null;
+          var first = state.products[0];
+          if (first && first[f] !== undefined) v = first[f];
+          return '<div class="xrow"><span class="badge b-info mono" style="text-transform:none">' + esc(f) + "</span>" +
+            '<span class="hint" style="flex:1 1 auto;min-width:0;overflow-wrap:anywhere">' + esc(v == null ? "" : short(v)) + "</span>" +
+            '<button type="button" class="toggle" data-toggle aria-pressed="false" aria-label="Show ' + esc(f) + '"></button></div>';
+        }).join("")
+      : '<p class="hint">No extra fields yet.</p>';
+
+    $("mapPanel").innerHTML =
+      '<div class="card" style="flex-direction:row;gap:14px;align-items:flex-start">' +
+        '<div class="sparkle" aria-hidden="true">✦</div>' +
+        '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:6px;min-width:0">' +
+          '<h3 style="font-size:18px;line-height:26px;font-weight:600;color:var(--fg)">AI matched your fields to Chattrn\'s</h3>' +
+          summary +
+        "</div>" +
+        '<button type="button" class="plain" id="resuggest">Suggest again</button>' +
+      "</div>" +
+      '<div class="card" style="padding:0;gap:0;overflow:hidden">' +
+        '<div class="tabs2" role="group" aria-label="Field groups">' + tabs + "</div>" +
+        tabPane(state.tab) +
+      "</div>" +
+      '<div class="card"><div><h3>Extra fields from your API</h3>' +
+        '<p class="hint" style="margin-top:4px">Not part of Chattrn\'s standard product. Keep the ones customers ask about; the AI can mention them.</p></div>' +
+        extraHtml + "</div>";
+  }
+
+  function wireMap() {
+    $("mapPanel").addEventListener("click", function (e) {
+      var t = e.target.closest ? e.target.closest("[data-tab],#resuggest,[data-toggle]") : null;
+      if (!t) return;
+      if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); renderMap(); }
+      else if (t.id === "resuggest") { state.suggested = { product: false, variant: false, zone: false }; renderMap(); }
+      else if (t.hasAttribute("data-toggle")) { t.setAttribute("aria-pressed", t.getAttribute("aria-pressed") === "true" ? "false" : "true"); }
+    });
+    $("mapPanel").addEventListener("change", function (e) {
+      var s = e.target;
+      if (!s.matches || !s.matches("select[data-scope]")) return;
+      var scope = s.getAttribute("data-scope");
+      var key = s.getAttribute("data-key");
+      var slot = s.getAttribute("data-slot");
+      if (!state.map[scope][key]) state.map[scope][key] = { primary: "", fallback: "" };
+      state.map[scope][key][slot] = s.value;
+      renderMap();
+      // The Product data table reads the same mapping, so it updates with each change.
+      renderProducts();
+    });
+  }
+
+  // ---- Steps -------------------------------------------------------------
+  var STEP_NEXT = ["Continue: map fields with AI", "Save mapping and test connection", "Continue: delivery setup", "Finish and connect store"];
+  var STEP_SUB = ["Endpoints and sign-in", "AI matches, you check", "Data and speed", "Where you deliver"];
+  function showStep(n) {
+    state.step = Math.max(1, Math.min(4, n));
+    document.querySelectorAll("[data-panel]").forEach(function (p) {
+      p.hidden = Number(p.getAttribute("data-panel")) !== state.step;
+    });
+    document.querySelectorAll(".step").forEach(function (b) {
+      var i = Number(b.getAttribute("data-step"));
+      b.classList.toggle("on", i === state.step);
+      b.classList.toggle("done", i < state.step);
+      b.querySelector(".num").textContent = i < state.step ? "✓" : String(i);
+      b.querySelector(".s").textContent = i < state.step ? "Edit" : i === state.step ? "You are here" : STEP_SUB[i - 1];
+    });
+    $("back").disabled = state.step === 1;
+    $("next").textContent = STEP_NEXT[state.step - 1];
+    if (state.step === 1) renderProducts();
+    if (state.step === 2) renderMap();
+    if (state.step === 3) renderTestPanel();
+  }
+
+  function setMode(m) {
+    state.mode = m;
+    $("ctxName").value = state.ctxName || "";
+    $("ctxHint").textContent = state.ctxName
+      ? "Found for this store. Zone and outlet calls send it."
+      : "Not known yet. Press Find zone parameter to detect the name this store uses.";
+    $("loadZones").hidden = m !== "zone";
+    $("zoneRows").innerHTML = "";
+    $("zoneStatus").textContent = m === "zone" ? "" : "Outlet-based: enter the outlet's ID in Tester settings.";
+  }
+
+  async function loadZones() {
+    var base = $("base").value.trim().replace(/\/+$/, "");
+    $("zoneStatus").textContent = "Loading zones…";
+    $("zoneRows").innerHTML = "";
+    var res = await get(base + "/delivery-zone");
+    if (!res.ok) { $("zoneStatus").textContent = res.error; return; }
+    if (res.http !== 200 || !res.isJson) { $("zoneStatus").textContent = "HTTP " + res.http + ": could not read zones."; return; }
+    var found = extractList(res.body);
+    if (!found || !found.list.length) { $("zoneStatus").textContent = "No zones found in the response."; return; }
+    $("zoneStatus").textContent = found.list.length + " zone(s). Press Use on one to test with it.";
+    $("zoneRows").innerHTML = found.list.filter(isObj).map(function (z) {
+      var zid = pick(z, "zone", "zid");
+      var id = zid != null && zid !== "" ? zid : (z.id != null ? z.id : z.code);
+      var zname = pick(z, "zone", "zname");
+      var name = zname != null && zname !== "" ? textOf(zname) : textOf(z.name || z.title || z.zone || z.area || String(id));
+      var areas = Array.isArray(z.areas) ? z.areas.map(textOf).join(", ") : textOf(z.areas || z.area || "");
+      var fee = z.delivery_fee != null ? z.delivery_fee : z.fee;
+      var min = z.minimum_order != null ? z.minimum_order : z.min_order;
+      return "<tr><td><strong>" + esc(name) + '</strong><div class="hint mono">' + esc(String(id)) + "</div></td>" +
+        "<td>" + esc(areas || "not sent") + "</td>" +
+        '<td class="mono">' + esc(fee != null ? fee : "not sent") + "</td>" +
+        '<td class="mono">' + esc(min != null ? min : "not sent") + "</td>" +
+        '<td class="mono">' + esc(z.products_count != null ? z.products_count : "not sent") + "</td>" +
+        '<td><button type="button" class="plain use-zone" data-zid="' + esc(String(id)) + '">Use</button></td></tr>';
+    }).join("");
+  }
+
+  // Talks to the Chattrn backend on the same origin. Used for the zone parameter discovery.
+  async function backend(method, p, body) {
+    var res = await fetch(p, {
+      method: method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    var json = await res.json().catch(function () { return {}; });
+    return { http: res.status, body: json };
+  }
+
+  // The backend store is created once per set of settings. Changing the URL, sign-in or Store Type makes a new one.
+  async function ensureBackendStore() {
+    if (state.storeId) return state.storeId;
+    var mode = $("auth").value;
+    var res = await backend("POST", "/api/stores", {
+      name: $("storeName").value.trim() || "Store",
+      base_url: $("base").value.trim(),
+      website_url: $("siteUrl").value.trim(),
+      currency: "BDT",
+      brand: $("brand").selectedIndex > 0 ? $("brand").value : null,
+      delivery_mode: $("storeType").value,
+      auth: { mode: mode, header: $("header").value.trim() || "X-API-Key", key: mode === "none" ? null : $("key").value },
+    });
+    if (res.http !== 200 && res.http !== 201) {
+      throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+    }
+    state.storeId = res.body.id;
+    return state.storeId;
+  }
+
+  function resetBackendStore() { state.storeId = null; }
+
+  function init() {
+    buildRows();
+    setMode($("storeType").value);
+    showChoice();
+    try {
+      var b = localStorage.getItem("prioTest.base");
+      if (b) $("base").value = b;
+    } catch (e) { /* storage may be blocked */ }
+  }
+
+  document.querySelectorAll(".step").forEach(function (b) {
+    b.addEventListener("click", function () { showStep(Number(b.getAttribute("data-step"))); });
+  });
+  $("back").addEventListener("click", function () { showStep(state.step - 1); });
+  function missingDetails() {
+    var m = [];
+    if (!$("siteUrl").value.trim()) m.push("Website URL");
+    if ($("brand").selectedIndex === 0) m.push("Assign brand");
+    if (!$("storeType").value) m.push("Store Type");
+    return m;
+  }
+  $("next").addEventListener("click", function () {
+    if (state.step === 1) {
+      var miss = missingDetails();
+      $("detailsErr").hidden = !miss.length;
+      $("detailsErr").textContent = miss.length ? "Fill in: " + miss.join(", ") + "." : "";
+      if (miss.length) return;
+    }
+    if (state.step < 4) { showStep(state.step + 1); return; }
+    finishConnection();
+  });
+  $("storeType").addEventListener("change", function () { setMode($("storeType").value); resetBackendStore(); });
+  ["base", "auth", "header", "key", "siteUrl"].forEach(function (id) {
+    $(id).addEventListener("change", resetBackendStore);
+  });
+  // Asks the backend which parameter name this store reads its zone from, and fills it in.
+  async function findZoneParam() {
+    $("zoneStatus").textContent = "Finding the zone parameter…";
+    try {
+      var id = await ensureBackendStore();
+      var res = await backend("POST", "/api/stores/" + id + "/location/discover", {});
+      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      state.ctxName = res.body.context_param || "";
+      $("ctxName").value = state.ctxName;
+      $("ctxHint").textContent = res.body.message;
+      $("zoneStatus").textContent = res.body.message;
+      return !!state.ctxName;
+    } catch (e) {
+      $("zoneStatus").textContent = "Could not run discovery: " + e.message;
+      return false;
+    }
+  }
+  // Reads every zone (or outlet) through the backend and tags each product with the zones it appears in.
+  // Customers are then answered from their own zone's products.
+  $("syncAll").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    $("zoneStatus").textContent = "Syncing every zone. This can take a minute…";
+    try {
+      var id = await ensureBackendStore();
+      var res = await backend("POST", "/api/stores/" + id + "/catalog/sync", {});
+      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      if (!res.body.ok) {
+        $("zoneStatus").textContent = res.body.message;
+      } else {
+        $("zoneStatus").textContent = "Synced " + res.body.products_total + " products from " + res.body.zones_checked +
+          " zones. Each product is tagged with the zones it appears in.";
+      }
+    } catch (e) {
+      $("zoneStatus").textContent = "Could not sync: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $("findParam").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    await findZoneParam();
+    btn.disabled = false;
+  });
+  $("zoneRows").addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".use-zone") : null;
+    if (!b) return;
+    var id = b.getAttribute("data-zid");
+    $("ctxValue").value = id;
+    state.ctxValue = id;
+    $("zoneStatus").textContent = "Using " + id + " for product tests.";
+  });
+  $("ctxName").addEventListener("input", function () { state.ctxName = $("ctxName").value.trim(); });
+  $("ctxValue").addEventListener("input", function () { state.ctxValue = $("ctxValue").value.trim(); });
+  $("loadZones").addEventListener("click", loadZones);
+  $("askBtn").addEventListener("click", askOpen);
+  $("askText").addEventListener("keydown", function (e) { if (e.key === "Enter") askOpen(); });
+  wireMap();
+  $("testPanel").addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest("#runAgain")) testAll();
+  });
+  $("auth").addEventListener("change", function () {
+    var none = $("auth").value === "none";
+    $("headerBox").hidden = $("auth").value !== "key";
+    $("keyBox").hidden = none;
+  });
+  document.querySelectorAll(".runAll").forEach(function (b) { b.addEventListener("click", testAll); });
+  $("base").addEventListener("change", function () {
+    try { localStorage.setItem("prioTest.base", $("base").value.trim()); } catch (e) { /* storage may be blocked */ }
+  });
+  $("copy").addEventListener("click", function () {
+    var report = {
+      generated: new Date().toISOString(),
+      base: $("base").value.trim(),
+      endpoints: ROWS.map(function (r) {
+        var x = state.rowResults[r.id] || { status: "skip" };
+        return { id: r.id, path: r.path, status: x.status, http: x.http || null, message: x.message || "", records: x.records ? x.records.length : null };
+      }),
+      product_fields: state.products.length ? Object.keys(fieldMap(state.products)).sort() : []
+    };
+    var btn = this;
+    navigator.clipboard.writeText(JSON.stringify(report, null, 2)).then(
+      function () { btn.textContent = "Copied"; },
+      function () { btn.textContent = "Copy blocked"; });
+  });
+
+
+  // ---- Connected stores list (first view). Shows stores whose connection check passed. ----
+  var GLOBE = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2.2 2 9.8 0 12M8 2c-2 2.2-2 9.8 0 12"/></svg>';
+  var DOTS = '<svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="4" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="10" cy="16" r="1.6"/></svg>';
+  var storeList = [];
+  var storeMenuFor = null;
+
+  function setCrumbStore(name) {
+    $("crumbStore").textContent = name || "";
+    $("crumbStore").hidden = !name;
+    $("crumbStoreSep").hidden = !name;
+  }
+  function hideAllViews() {
+    $("listView").hidden = true;
+    $("wizardView").hidden = true;
+    $("detailView").hidden = true;
+    $("connectChoiceView").hidden = true;
+    $("chattrnWizardView").hidden = true;
+    $("laravelWizardView").hidden = true;
+  }
+  function showList() {
+    setCrumbStore("");
+    hideAllViews();
+    $("listView").hidden = false;
+    closeStoreMenu();
+    loadStores();
+  }
+  function showWizard() {
+    setCrumbStore("");
+    hideAllViews();
+    $("wizardView").hidden = false;
+    closeStoreMenu();
+    showStep(1);
+  }
+  function showChoice() {
+    setCrumbStore("");
+    hideAllViews();
+    $("connectChoiceView").hidden = false;
+    $("siteCheckUrl").value = "";
+    closeStoreMenu();
+  }
+  function setBanner(text) {
+    $("listBannerText").textContent = text || "";
+    $("listBanner").hidden = !text;
+  }
+  async function loadStores() {
+    $("storeRows").innerHTML = '<tr><td colspan="5" class="hint">Loading connected stores…</td></tr>';
+    var res;
+    try { res = await backend("GET", "/api/stores"); } catch (e) { res = { http: 0, body: {} }; }
+    if (res.http !== 200) {
+      $("listTools").hidden = true;
+      $("storeTableWrap").hidden = true;
+      $("storeRows").innerHTML = '<tr><td colspan="5" style="color:var(--fail)">Could not load the connected stores. Check that the Chattrn backend is running.</td></tr>';
+      return;
+    }
+    storeList = (res.body.stores || []).filter(function (s) { return s.status === "connected"; });
+    // With no connected store, only the Connect card shows (Figma 34084:29549).
+    var hasStores = storeList.length > 0;
+    $("listTools").hidden = !hasStores;
+    $("storeTableWrap").hidden = !hasStores;
+    renderStores();
+  }
+  function renderStores() {
+    var q = $("storeSearch").value.trim().toLowerCase();
+    var shown = storeList.filter(function (s) {
+      if (!q) return true;
+      return [s.name, s.website_url, s.brand].some(function (v) { return v && String(v).toLowerCase().indexOf(q) !== -1; });
+    });
+    if (!shown.length) {
+      var msg = storeList.length ? "No connected store matches your search." : "No connected stores yet. Press Connect to add your first store.";
+      $("storeRows").innerHTML = '<tr><td colspan="5" class="hint">' + msg + '</td></tr>';
+      return;
+    }
+    $("storeRows").innerHTML = shown.map(function (s) {
+      return '<tr>' +
+        '<td><span class="store-name"><span class="store-logo">' + GLOBE + '</span><button type="button" class="store-link" data-open="' + esc(s.id) + '">' + esc(s.name) + '</button></span></td>' +
+        '<td>' + esc(String(s.website_url || "—").replace(/^https?:\/\//, "").replace(/\/$/, "")) + '</td>' +
+        '<td>' + esc(s.brand || "—") + '</td>' +
+        '<td><span class="badge b-pass">Connected</span></td>' +
+        '<td class="act"><button type="button" class="icon-btn" aria-label="Store actions for ' + esc(s.name) + '" aria-expanded="false" data-store="' + esc(s.id) + '">' + DOTS + '</button></td>' +
+        '</tr>';
+    }).join("");
+  }
+  function closeStoreMenu() {
+    storeMenuFor = null;
+    $("storeMenu").hidden = true;
+    document.querySelectorAll(".icon-btn[aria-expanded='true']").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+  }
+  function openStoreMenu(btn) {
+    closeStoreMenu();
+    storeMenuFor = btn.getAttribute("data-store");
+    var r = btn.getBoundingClientRect();
+    var m = $("storeMenu");
+    m.hidden = false;
+    m.style.top = (r.bottom + 4) + "px";
+    m.style.left = Math.max(8, r.right - m.offsetWidth) + "px";
+    btn.setAttribute("aria-expanded", "true");
+  }
+  $("storeRows").addEventListener("click", function (e) {
+    var l = e.target.closest ? e.target.closest(".store-link") : null;
+    if (l) { showDetail(l.getAttribute("data-open")); return; }
+    var b = e.target.closest ? e.target.closest(".icon-btn") : null;
+    if (!b) return;
+    if (storeMenuFor === b.getAttribute("data-store") && !$("storeMenu").hidden) closeStoreMenu();
+    else openStoreMenu(b);
+  });
+  $("copyStoreId").addEventListener("click", function () {
+    var id = storeMenuFor;
+    closeStoreMenu();
+    if (!id || !navigator.clipboard) { setBanner("Could not copy the store ID here."); return; }
+    navigator.clipboard.writeText(id).then(
+      function () { setBanner("Store ID copied."); },
+      function () { setBanner("Could not copy the store ID here."); });
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest || (!e.target.closest("#storeMenu") && !e.target.closest(".icon-btn"))) closeStoreMenu();
+  });
+  $("storeSearch").addEventListener("input", renderStores);
+  $("connectBtn").addEventListener("click", function () { resetBackendStore(); setBanner(""); showChoice(); });
+  $("backFromChoice").addEventListener("click", showList);
+  $("chooseMappedApi").addEventListener("click", function () { resetBackendStore(); showWizard(); });
+  $("chooseChattrnApi").addEventListener("click", function () { resetChattrnStore(); showChattrnWizard(); });
+  $("chooseLaravel").addEventListener("click", function () { resetLaravelStore(); showLaravelWizard(); });
+  $("siteCheckBtn").addEventListener("click", function () {
+    // Website-check probing is out of scope for this build (see devspec's "Website check" tool) —
+    // this just nudges toward the two supported connection paths below.
+    var u = $("siteCheckUrl").value.trim();
+    alert(u ? "Website check isn't wired up yet. Pick a connection option below for \"" + u + "\"." : "Enter a website address, or pick a connection option below.");
+  });
+
+  // Finish runs the connection check again. The store joins the list only when that check passes.
+  async function finishConnection() {
+    var btn = $("next");
+    btn.disabled = true;
+    $("finishNote").style.color = "";
+    $("finishNote").textContent = "Checking the connection…";
+    try {
+      var id = await ensureBackendStore();
+      var res = await backend("POST", "/api/stores/" + id + "/connection/check", {});
+      if (res.http !== 200 || res.body.state !== "connected") {
+        throw new Error(res.body.message || ("HTTP " + res.http));
+      }
+      $("finishNote").textContent = "";
+      showList();
+      setBanner(($("storeName").value.trim() || "Store") + " is connected.");
+    } catch (e) {
+      $("finishNote").style.color = "var(--fail)";
+      $("finishNote").textContent = "Not connected yet: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+
+  // ---- Store overview (opened from the list). Edit connection reopens the wizard with this store. ----
+  var detailStore = null;
+  function hostOf(u) { return String(u || "").replace(/^https?:\/\//, "").replace(/\/$/, ""); }
+  function kv(label, valueHtml) {
+    return '<div class="kv"><span class="kv-l">' + esc(label) + '</span><span class="kv-v">' + valueHtml + '</span></div>';
+  }
+  function showDetail(id) {
+    hideAllViews();
+    $("detailView").hidden = false;
+    closeStoreMenu();
+    $("detailBody").innerHTML = '<p class="hint">Loading…</p>';
+    loadDetail(id);
+  }
+  async function loadDetail(id) {
+    var res;
+    try { res = await backend("GET", "/api/stores/" + encodeURIComponent(id)); } catch (e) { res = { http: 0, body: {} }; }
+    if (res.http !== 200) {
+      $("detailBody").innerHTML = '<p class="hint" style="color:var(--fail)">Could not load this store.</p>';
+      return;
+    }
+    renderDetail(res.body);
+  }
+  function renderDetail(s) {
+    detailStore = s;
+    setCrumbStore(s.name);
+    if (s.connection_type === "chattrn_api") { renderChattrnDetail(s); return; }
+    if (s.connection_type === "laravel_package") { renderLaravelDetail(s); return; }
+    var site = /^https?:\/\//.test(s.website_url || "")
+      ? '<a href="' + esc(s.website_url) + '" target="_blank" rel="noopener">' + esc(hostOf(s.website_url)) + '</a>'
+      : esc(s.website_url || "—");
+    var delivery = s.delivery && s.delivery.mode === "outlet" ? "Outlet-based" : "Zone-based";
+    var status = s.status === "connected"
+      ? '<span class="badge b-pass">Connected</span>'
+      : s.status === "disconnected"
+        ? '<span class="badge b-skip">Disconnected</span>'
+        : '<span class="badge b-warn">Not connected</span>';
+    var synced = s.catalog && s.catalog.synced_at ? new Date(s.catalog.synced_at).toLocaleString() : "Never";
+    var products = s.catalog && Array.isArray(s.catalog.products) ? String(s.catalog.products.length) : "—";
+    var zones = s.catalog && s.catalog.zones_checked ? String(s.catalog.zones_checked) : "—";
+    $("detailBody").innerHTML =
+      '<div class="card"><h3 class="card-title">Store</h3>' +
+        kv("Website", site) +
+        kv("Connection", "Map my existing API") +
+        kv("API base URL", esc(hostOf(s.base_url) || "—")) +
+        kv("Brand", esc(s.brand || "—")) +
+        kv("Delivery", delivery) +
+        kv("Status", status) +
+        '<div class="detail-actions">' +
+          '<button type="button" class="btn-grey" data-act="edit">Edit connection</button>' +
+          (s.status === "connected" ? '<button type="button" class="btn-red" data-act="disconnect">Disconnect</button>' : "") +
+        '</div>' +
+        '<p class="hint" id="detailNote"></p>' +
+      '</div>' +
+      '<div class="card"><h3 class="card-title">Sync health</h3>' +
+        kv("Product sync", "Not scheduled yet") +
+        kv("Last sync", esc(synced)) +
+        kv("Products in catalog", products) +
+        kv("Zones checked", zones) +
+        kv("Full catalog check", "Not scheduled yet") +
+        kv("Failed syncs", "Not tracked yet") +
+      '</div>';
+  }
+
+  // Connection (Chattrn API) tab (devspec.txt screens list, "11d. Custom website: Connection (Chattrn API)").
+  function renderChattrnDetail(s) {
+    var site = /^https?:\/\//.test(s.website_url || "")
+      ? '<a href="' + esc(s.website_url) + '" target="_blank" rel="noopener">' + esc(hostOf(s.website_url)) + '</a>'
+      : esc(s.website_url || "—");
+    var delivery = s.delivery && s.delivery.mode === "outlet" ? "Outlet-based" : "Zone-based";
+    var status = s.status === "connected"
+      ? '<span class="badge b-pass">Connected</span>'
+      : s.status === "disconnected"
+        ? '<span class="badge b-skip">Disconnected</span>'
+        : '<span class="badge b-warn">Not connected</span>';
+    var chattrn = s.chattrn || {};
+    $("detailBody").innerHTML =
+      '<div class="card"><h3 class="card-title">Store</h3>' +
+        kv("Website", site) +
+        kv("Connection", "Chattrn API") +
+        kv("Brand", esc(s.brand || "—")) +
+        kv("Delivery", delivery) +
+        kv("Status", status) +
+        '<div class="detail-actions">' +
+          '<button type="button" class="btn-grey" data-act="edit">Edit connection</button>' +
+          (s.status === "connected" ? '<button type="button" class="btn-red" data-act="disconnect">Disconnect</button>' : "") +
+        '</div>' +
+        '<p class="hint" id="detailNote"></p>' +
+      '</div>' +
+      '<div class="card"><h3 class="card-title">Connection</h3>' +
+        kv("Base URL", esc(hostOf(chattrn.base_url) || "—")) +
+        kv("Access token", chattrn.token_saved ? "•••• saved" : "Not saved") +
+        kv("API version", esc(chattrn.api_version || "—")) +
+        kv("Currency", esc(s.currency || "—")) +
+        kv("Country", esc(s.country_code || "—")) +
+        '<div class="detail-actions">' +
+          '<button type="button" class="btn-grey" data-act="replace-token">Replace key</button>' +
+          '<button type="button" class="btn-grey" data-act="run-test">Run test again</button>' +
+        '</div>' +
+        '<p class="hint" id="chattrnDetailNote"></p>' +
+        '<h3 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:10px">Endpoints</h3>' +
+        '<div class="check-list" id="chattrnEndpointList"><p class="hint">Loading…</p></div>' +
+      '</div>';
+    loadChattrnEndpoints(s.id);
+  }
+
+  async function loadChattrnEndpoints(id) {
+    var res;
+    try { res = await backend("GET", "/api/stores/" + id + "/chattrn/endpoints"); } catch (e) { res = { http: 0, body: {} }; }
+    var el = $("chattrnEndpointList");
+    if (!el) return;
+    var checks = res.body && res.body.checks;
+    el.innerHTML = checks && checks.length
+      ? checks.map(checkRowHtml).join("")
+      : '<p class="hint">No test has been run yet. Press Run test again.</p>';
+  }
+
+  // Connection (Laravel package) tab (devspec.txt screens list, "11c/11e. Laravel package: Connection").
+  function renderLaravelDetail(s) {
+    var site = /^https?:\/\//.test(s.website_url || "")
+      ? '<a href="' + esc(s.website_url) + '" target="_blank" rel="noopener">' + esc(hostOf(s.website_url)) + '</a>'
+      : esc(s.website_url || "—");
+    var delivery = s.delivery && s.delivery.mode === "outlet" ? "Outlet-based" : "Zone-based";
+    var status = s.status === "connected"
+      ? '<span class="badge b-pass">Connected</span>'
+      : s.status === "disconnected"
+        ? '<span class="badge b-skip">Disconnected</span>'
+        : '<span class="badge b-warn">Not connected</span>';
+    var laravel = s.laravel || {};
+    var registered = !!laravel.registered_at;
+    $("detailBody").innerHTML =
+      '<div class="card"><h3 class="card-title">Store</h3>' +
+        kv("Website", site) +
+        kv("Connection", "Laravel package") +
+        kv("Brand", esc(s.brand || "—")) +
+        kv("Delivery", delivery) +
+        kv("Status", status) +
+        '<div class="detail-actions">' +
+          '<button type="button" class="btn-grey" data-act="edit">Edit connection</button>' +
+          (s.status === "connected" ? '<button type="button" class="btn-red" data-act="disconnect">Disconnect</button>' : "") +
+        '</div>' +
+        '<p class="hint" id="detailNote"></p>' +
+      '</div>' +
+      '<div class="card"><h3 class="card-title">Package</h3>' +
+        kv("Connection token", registered ? "&#8226;&#8226;&#8226;&#8226; registered" : (laravel.token_pending ? "Pending — paste it into .env" : "Not generated yet")) +
+        kv("Package version", esc(laravel.package_version || "—")) +
+        kv("Laravel version", esc(laravel.framework_version || "—")) +
+        kv("Route prefix", esc(laravel.route_prefix || "—")) +
+        kv("Last seen", laravel.last_seen_at ? new Date(laravel.last_seen_at).toLocaleString() : "—") +
+        '<div class="detail-actions">' +
+          '<button type="button" class="btn-grey" data-act="regenerate-token">Regenerate token</button>' +
+          '<button type="button" class="btn-grey" data-act="edit-config">Edit config</button>' +
+          '<button type="button" class="btn-grey" data-act="run-map-again">Run chattrn:map again</button>' +
+        '</div>' +
+        '<p class="hint" id="laravelDetailNote"></p>' +
+        '<h3 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:10px">Package &amp; tables</h3>' +
+        '<div id="laravelStatusList"><p class="hint">Loading…</p></div>' +
+      '</div>';
+    loadLaravelStatus(s.id);
+  }
+
+  async function loadLaravelStatus(id) {
+    var el = $("laravelStatusList");
+    if (!el) return;
+    var res;
+    try { res = await backend("GET", "/api/stores/" + id + "/laravel/install-status"); } catch (e) { res = { http: 0, body: {} }; }
+    var checks = res.body && res.body.checks;
+    el.innerHTML = checks && checks.length ? checks.map(checkRowHtml).join("") : '<p class="hint">Could not load package status.</p>';
+  }
+  // Reopens the wizard filled with this store. The sign-in key is not shown, so keep it unless you type a new one.
+  function prefillWizard(s) {
+    resetBackendStore();
+    $("storeName").value = s.name || "";
+    $("siteUrl").value = s.website_url || "";
+    $("base").value = s.base_url || "";
+    var brand = $("brand");
+    if (s.brand && !Array.from(brand.options).some(function (o) { return o.value === s.brand; })) brand.add(new Option(s.brand, s.brand));
+    brand.value = s.brand || brand.options[0].value;
+    $("storeType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
+    if (s.auth && s.auth.mode) $("auth").value = s.auth.mode;
+    if (s.auth && s.auth.header) $("header").value = s.auth.header;
+    $("auth").dispatchEvent(new Event("change"));
+    setMode($("storeType").value);
+    state.storeId = s.id;
+  }
+  $("detailBody").addEventListener("click", async function (e) {
+    var b = e.target.closest ? e.target.closest("[data-act]") : null;
+    if (!b || !detailStore) return;
+    var act = b.getAttribute("data-act");
+    var isChattrn = detailStore.connection_type === "chattrn_api";
+    var isLaravel = detailStore.connection_type === "laravel_package";
+    if (act === "edit") {
+      if (isLaravel) { prefillLaravelWizard(detailStore); showLaravelWizard(); }
+      else if (isChattrn) { prefillChattrnWizard(detailStore); showChattrnWizard(); }
+      else { prefillWizard(detailStore); showWizard(); }
+    }
+    if (act === "disconnect") disconnectStore();
+    if (act === "regenerate-token") {
+      var lnote = $("laravelDetailNote");
+      if (!window.confirm("Regenerate the access token for " + detailStore.name + "? The package's old token stops working until you update its .env.")) return;
+      try {
+        var rr = await backend("POST", "/api/stores/" + detailStore.id + "/laravel/regenerate-token", {});
+        if (rr.http !== 200) throw new Error((rr.body.error && rr.body.error.message) || ("HTTP " + rr.http));
+        if (lnote) { lnote.style.color = ""; lnote.textContent = "New token: " + rr.body.access_token + " — set CHATTRN_ACCESS_TOKEN to this in the app's .env, then redeploy."; }
+        loadDetail(detailStore.id);
+      } catch (err) {
+        if (lnote) { lnote.style.color = "var(--fail)"; lnote.textContent = "Could not regenerate: " + err.message; }
+      }
+    }
+    if (act === "edit-config") {
+      var lnote2 = $("laravelDetailNote");
+      if (lnote2) { lnote2.style.color = ""; lnote2.textContent = "Edit config/chattrn.php on your server, then run php artisan chattrn:map again to re-register."; }
+    }
+    if (act === "run-map-again") {
+      var lnote3 = $("laravelDetailNote");
+      if (lnote3) { lnote3.style.color = ""; lnote3.textContent = "Run php artisan chattrn:map on your server to re-match models and refresh the status below."; }
+      loadLaravelStatus(detailStore.id);
+    }
+    if (act === "replace-token") {
+      var token = window.prompt("New access token for " + detailStore.name + ":");
+      if (!token) return;
+      var note = $("chattrnDetailNote");
+      try {
+        var res = await backend("PUT", "/api/stores/" + detailStore.id + "/chattrn/token", { access_token: token });
+        if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+        if (note) note.textContent = "Key replaced.";
+        loadDetail(detailStore.id);
+      } catch (err) {
+        if (note) { note.style.color = "var(--fail)"; note.textContent = "Not saved: " + err.message; }
+      }
+    }
+    if (act === "run-test") {
+      var note2 = $("chattrnDetailNote");
+      if (note2) note2.textContent = "Running the 9 checks…";
+      try {
+        var r = await backend("POST", "/api/stores/" + detailStore.id + "/test-runs", {});
+        if (r.http !== 200) throw new Error("HTTP " + r.http);
+        if (note2) note2.textContent = "Test finished: " + r.body.summary.passed + " passed.";
+        loadChattrnEndpoints(detailStore.id);
+      } catch (err) {
+        if (note2) { note2.style.color = "var(--fail)"; note2.textContent = "Could not run the test: " + err.message; }
+      }
+    }
+  });
+  $("crumbAll").addEventListener("click", function (e) { e.preventDefault(); showList(); });
+  async function disconnectStore() {
+    var s = detailStore;
+    if (!s || !window.confirm("Disconnect " + s.name + "? It will leave the connected list.")) return;
+    try {
+      var res = await backend("POST", "/api/stores/" + encodeURIComponent(s.id) + "/disconnect", {});
+      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      showList();
+      setBanner(s.name + " is disconnected.");
+    } catch (e) {
+      var note = $("detailNote");
+      if (note) note.textContent = "Could not disconnect: " + e.message;
+    }
+  }
+
+
+  // ---- Chattrn API wizard (native connector, slice 1B: Store and API -> Test connection -> Delivery setup) ----
+  var cState = { step: 1, storeId: null };
+  var CSTEP_NEXT = ["Continue: test connection", "Continue: delivery setup", "Finish and connect store"];
+  var CSTEP_SUB = ["Base URL and access token", "Data and speed", "Where you deliver"];
+
+  function resetChattrnStore() { cState.storeId = null; }
+
+  function showChattrnWizard() {
+    setCrumbStore("");
+    hideAllViews();
+    $("chattrnWizardView").hidden = false;
+    closeStoreMenu();
+    cShowStep(1);
+  }
+
+  function cShowStep(n) {
+    cState.step = Math.max(1, Math.min(3, n));
+    document.querySelectorAll("[data-cpanel]").forEach(function (p) {
+      p.hidden = Number(p.getAttribute("data-cpanel")) !== cState.step;
+    });
+    document.querySelectorAll(".cstep").forEach(function (b) {
+      var i = Number(b.getAttribute("data-cstep"));
+      b.classList.toggle("on", i === cState.step);
+      b.classList.toggle("done", i < cState.step);
+      b.querySelector(".num").textContent = i < cState.step ? "✓" : String(i);
+      b.querySelector(".s").textContent = i < cState.step ? "Edit" : i === cState.step ? "You are here" : CSTEP_SUB[i - 1];
+    });
+    $("cBack").disabled = cState.step === 1;
+    $("cNext").textContent = CSTEP_NEXT[cState.step - 1];
+    if (cState.step === 2) runChattrnTest();
+    if (cState.step === 3) loadChattrnZones();
+  }
+  document.querySelectorAll(".cstep").forEach(function (b) {
+    b.addEventListener("click", function () { if (Number(b.getAttribute("data-cstep")) <= cState.step) cShowStep(Number(b.getAttribute("data-cstep"))); });
+  });
+  $("cBack").addEventListener("click", function () { cShowStep(cState.step - 1); });
+
+  function cMissingDetails() {
+    var m = [];
+    if (!$("cSiteUrl").value.trim()) m.push("Website URL");
+    if ($("cBrand").selectedIndex === 0) m.push("Assign brand");
+    if (!$("cBase").value.trim()) m.push("API base URL");
+    return m;
+  }
+
+  // Creates (or reuses) the backend store, then runs the API connection check (devspec.txt: "API connection check").
+  async function ensureChattrnStore() {
+    if (!cState.storeId) {
+      var res = await backend("POST", "/api/stores", {
+        name: $("cStoreName").value.trim() || "Store",
+        website_url: $("cSiteUrl").value.trim(),
+        brand: $("cBrand").selectedIndex > 0 ? $("cBrand").value : null,
+        connection_type: "chattrn_api",
+        delivery_mode: $("cStoreType").value,
+        base_url: $("cBase").value.trim(),
+        access_token: $("cToken").value,
+      });
+      if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      cState.storeId = res.body.id;
+    }
+    return cState.storeId;
+  }
+
+  async function chattrnCheck() {
+    var id = await ensureChattrnStore();
+    var res = await backend("POST", "/api/stores/" + id + "/chattrn/check", {});
+    return res.body;
+  }
+
+  $("cNext").addEventListener("click", async function () {
+    var btn = this;
+    if (cState.step === 1) {
+      var miss = cMissingDetails();
+      $("cDetailsErr").hidden = !miss.length;
+      $("cDetailsErr").textContent = miss.length ? "Fill in: " + miss.join(", ") + "." : "";
+      if (miss.length) return;
+      btn.disabled = true;
+      $("cCheckMsg").style.color = "";
+      $("cCheckMsg").textContent = "Checking the connection…";
+      try {
+        var result = await chattrnCheck();
+        if (result.state !== "connected") throw new Error(result.message || "Could not connect.");
+        $("cCheckMsg").textContent = result.message || "Connected.";
+        cShowStep(2);
+      } catch (e) {
+        $("cCheckMsg").style.color = "var(--fail)";
+        $("cCheckMsg").textContent = "Not connected yet: " + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+    if (cState.step < 3) { cShowStep(cState.step + 1); return; }
+    await finishChattrnConnection();
+  });
+
+  ["cBase", "cToken", "cSiteUrl"].forEach(function (id) { $(id).addEventListener("change", resetChattrnStore); });
+
+  function checkRowHtml(c) {
+    var cls = c.state === "passed" || c.state === "pass" ? "b-pass" : c.state === "failed" || c.state === "error" ? "b-fail" : c.state === "needs_attention" || c.state === "warning" ? "b-warn" : "b-skip";
+    var label = c.state === "passed" ? "Passed" : c.state === "pass" ? "Pass" : c.state === "failed" ? "Failed" : c.state === "needs_attention" ? "Needs attention" : c.state === "warning" ? "Warning" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : c.state;
+    return '<div class="check-row"><span class="label">' + esc(c.label) + '</span><span class="msg">' + esc(c.message || "") + '</span><span class="badge ' + cls + '">' + esc(label) + '</span></div>';
+  }
+
+  async function runChattrnTest() {
+    var id;
+    $("cTestPanel").innerHTML = '<p class="hint">Running the 9 checks against your store…</p>';
+    try {
+      id = await ensureChattrnStore();
+      var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
+      var run = res.body;
+      var checksHtml = '<div class="card"><h3 class="card-title">Test connection</h3><div class="check-list">' +
+        run.checks.map(checkRowHtml).join("") + '</div></div>';
+      var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
+        (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
+      $("cTestPanel").innerHTML = checksHtml + dqHtml;
+      $("cNext").disabled = !run.can_continue;
+      if (!run.can_continue) $("cCheckMsg").textContent = "Store profile and Catalog must pass before continuing.";
+    } catch (e) {
+      $("cTestPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the test: ' + esc(e.message) + '</p>';
+    }
+  }
+
+  async function loadChattrnZones() {
+    $("cZoneRows").innerHTML = '<tr><td colspan="3" class="hint">Loading zones…</td></tr>';
+    try {
+      var id = await ensureChattrnStore();
+      var res = await backend("GET", "/api/stores/" + id + "/zones");
+      if (res.http !== 200) throw new Error("HTTP " + res.http);
+      var zones = res.body.zones || [];
+      if (!zones.length) { $("cZoneRows").innerHTML = '<tr><td colspan="3" class="hint">No zones returned by GET /locations.json.</td></tr>'; return; }
+      $("cZoneRows").innerHTML = zones.map(function (z) {
+        return '<tr><td>' + esc(z.name || String(z.id)) + '</td><td>' + esc((z.areas || []).join(", ") || "—") + '</td><td>' + esc(z.min_order || "—") + '</td></tr>';
+      }).join("");
+    } catch (e) {
+      $("cZoneRows").innerHTML = '<tr><td colspan="3" class="hint" style="color:var(--fail)">Could not read zones: ' + esc(e.message) + '</td></tr>';
+    }
+  }
+
+  async function finishChattrnConnection() {
+    var btn = $("cNext");
+    btn.disabled = true;
+    $("cFinishNote").style.color = "";
+    $("cFinishNote").textContent = "Connecting…";
+    try {
+      var id = await ensureChattrnStore();
+      await backend("PUT", "/api/stores/" + id + "/delivery-settings", {
+        mode: $("cStoreType").value,
+        ask_area_when: "when_needed",
+        remember_area: $("cRemember").checked,
+      });
+      var result = await chattrnCheck();
+      if (result.state !== "connected") throw new Error(result.message || "Could not connect.");
+      $("cFinishNote").textContent = "";
+      showList();
+      setBanner(($("cStoreName").value.trim() || "Store") + " is connected.");
+    } catch (e) {
+      $("cFinishNote").style.color = "var(--fail)";
+      $("cFinishNote").textContent = "Not connected yet: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Reopens the Chattrn wizard filled with this store, for Edit connection. The access token is never shown back.
+  function prefillChattrnWizard(s) {
+    resetChattrnStore();
+    $("cStoreName").value = s.name || "";
+    $("cSiteUrl").value = s.website_url || "";
+    var brand = $("cBrand");
+    if (s.brand && !Array.from(brand.options).some(function (o) { return o.value === s.brand; })) brand.add(new Option(s.brand, s.brand));
+    brand.value = s.brand || brand.options[0].value;
+    $("cStoreType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
+    $("cBase").value = (s.chattrn && s.chattrn.base_url) || "";
+    $("cToken").value = "";
+    cState.storeId = s.id;
+  }
+
+  // ---- Laravel package wizard (slice 3: Install package -> Test connection -> Delivery setup) ----
+  var lState = { step: 1, storeId: null, sniffed: false, pollTimer: null };
+  var LSTEP_NEXT = ["Continue: test connection", "Continue: delivery setup", "Finish and connect store"];
+  var LSTEP_SUB = ["Composer and artisan commands", "Data and speed", "Where you deliver"];
+
+  function resetLaravelStore() { lState.storeId = null; lState.sniffed = false; stopLaravelPoll(); }
+
+  function showLaravelWizard() {
+    setCrumbStore("");
+    hideAllViews();
+    $("laravelWizardView").hidden = false;
+    closeStoreMenu();
+    $("lTokenLine").textContent = "Generate a token to continue…";
+    $("lCopyToken").setAttribute("data-copy", "");
+    $("lTokenNote").textContent = "";
+    lShowStep(1);
+  }
+
+  function lShowStep(n) {
+    lState.step = Math.max(1, Math.min(3, n));
+    document.querySelectorAll("[data-lpanel]").forEach(function (p) {
+      p.hidden = Number(p.getAttribute("data-lpanel")) !== lState.step;
+    });
+    document.querySelectorAll(".lstep").forEach(function (b) {
+      var i = Number(b.getAttribute("data-lstep"));
+      b.classList.toggle("on", i === lState.step);
+      b.classList.toggle("done", i < lState.step);
+      b.querySelector(".num").textContent = i < lState.step ? "✓" : String(i);
+      b.querySelector(".s").textContent = i < lState.step ? "Edit" : i === lState.step ? "You are here" : LSTEP_SUB[i - 1];
+    });
+    $("lBack").disabled = lState.step === 1;
+    $("lNext").textContent = LSTEP_NEXT[lState.step - 1];
+    if (lState.step === 1) {
+      if (lState.storeId) { loadLaravelWaitRows(); startLaravelPoll(); }
+      else { $("lWaitRows").innerHTML = '<p class="hint">Fill in the website URL and generate a token below to get started.</p>'; }
+    } else {
+      stopLaravelPoll();
+    }
+    if (lState.step === 2) runLaravelTest();
+    if (lState.step === 3) loadLaravelZones();
+  }
+  document.querySelectorAll(".lstep").forEach(function (b) {
+    b.addEventListener("click", function () { if (Number(b.getAttribute("data-lstep")) <= lState.step) lShowStep(Number(b.getAttribute("data-lstep"))); });
+  });
+  $("lBack").addEventListener("click", function () { lShowStep(lState.step - 1); });
+
+  function lMissingDetails() {
+    var m = [];
+    if (!$("lSiteUrl").value.trim()) m.push("Website URL");
+    if ($("lBrand").selectedIndex === 0) m.push("Assign brand");
+    return m;
+  }
+
+  // Creates (or reuses) the backend store for this wizard session.
+  async function ensureLaravelStore() {
+    if (!lState.storeId) {
+      var res = await backend("POST", "/api/stores", {
+        name: $("lStoreName").value.trim() || "Store",
+        website_url: $("lSiteUrl").value.trim(),
+        brand: $("lBrand").selectedIndex > 0 ? $("lBrand").value : null,
+        connection_type: "laravel_package",
+        delivery_mode: $("lStoreType").value,
+      });
+      if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      lState.storeId = res.body.id;
+    }
+    return lState.storeId;
+  }
+
+  ["lSiteUrl", "lBrand", "lStoreType"].forEach(function (id) {
+    $(id).addEventListener("change", function () { resetLaravelStore(); $("lTokenLine").textContent = "Generate a token to continue…"; $("lTokenNote").textContent = ""; });
+  });
+
+  // "Modal: Laravel not detected" - sniffs the entered website once, before minting a token.
+  function showLaravelModal(framework) {
+    $("laravelModalMsg").textContent = framework
+      ? "We checked this website and it looks like " + framework + ", not Laravel."
+      : "We checked this website and didn't see signs of a Laravel app.";
+    $("laravelModalBackdrop").hidden = false;
+  }
+  function hideLaravelModal() { $("laravelModalBackdrop").hidden = true; }
+  $("laravelModalContinue").addEventListener("click", function () { hideLaravelModal(); lGenerateToken(); });
+  $("laravelModalSwitch").addEventListener("click", function () {
+    hideLaravelModal();
+    resetBackendStore();
+    $("siteUrl").value = $("lSiteUrl").value;
+    showWizard();
+  });
+
+  async function lGenerateToken() {
+    var btn = $("lGenToken");
+    btn.disabled = true;
+    $("lTokenNote").style.color = "";
+    $("lTokenNote").textContent = "Generating…";
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("POST", "/api/stores/" + id + "/laravel/connection-token", {});
+      if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      var line = "CHATTRN_TOKEN=" + res.body.token;
+      $("lTokenLine").textContent = line;
+      $("lCopyToken").setAttribute("data-copy", line);
+      var mins = Math.max(1, Math.round((new Date(res.body.expires_at) - Date.now()) / 60000));
+      $("lTokenNote").textContent = "Expires in about " + mins + " minutes. Generating again replaces it.";
+      loadLaravelWaitRows();
+      startLaravelPoll();
+    } catch (e) {
+      $("lTokenNote").style.color = "var(--fail)";
+      $("lTokenNote").textContent = "Could not generate a token: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  $("lGenToken").addEventListener("click", async function () {
+    var site = $("lSiteUrl").value.trim();
+    if (!site) { $("lDetailsErr").hidden = false; $("lDetailsErr").textContent = "Fill in: Website URL."; return; }
+    if (lState.sniffed) { lGenerateToken(); return; }
+    var btn = this;
+    btn.disabled = true;
+    $("lTokenNote").style.color = "";
+    $("lTokenNote").textContent = "Checking the website…";
+    try {
+      var res = await backend("POST", "/api/website-sniff", { website_url: site });
+      lState.sniffed = true;
+      $("lTokenNote").textContent = "";
+      if (res.http === 200 && res.body.checked && res.body.laravel_likely === false) {
+        btn.disabled = false;
+        showLaravelModal(res.body.framework);
+        return;
+      }
+      btn.disabled = false;
+      lGenerateToken();
+    } catch (e) {
+      lState.sniffed = true;
+      btn.disabled = false;
+      lGenerateToken();
+    }
+  });
+
+  function waitRowHtml(c) {
+    var cls = c.state === "pass" ? "pass" : c.state === "warn" ? "warn" : "pending";
+    var icon = cls === "pass" ? "&#10003;" : cls === "warn" ? "!" : "&middot;";
+    return '<div class="wait-row"><span class="wicon ' + cls + '">' + icon + '</span><div class="wbody"><div class="wtitle">' + esc(c.label) + '</div><div class="wsub">' + esc(c.message || "") + '</div></div></div>';
+  }
+
+  async function loadLaravelWaitRows() {
+    if (!lState.storeId) {
+      $("lWaitRows").innerHTML = '<p class="hint">Fill in the website URL and generate a token below to get started.</p>';
+      return;
+    }
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
+      if (res.http !== 200) throw new Error("HTTP " + res.http);
+      $("lWaitRows").innerHTML = res.body.checks.map(waitRowHtml).join("");
+      $("lNext").disabled = lState.step === 1 && !res.body.can_continue;
+    } catch (e) {
+      $("lWaitRows").innerHTML = '<p class="hint" style="color:var(--fail)">Could not load status: ' + esc(e.message) + '</p>';
+    }
+  }
+  $("lRecheck").addEventListener("click", loadLaravelWaitRows);
+
+  function startLaravelPoll() {
+    stopLaravelPoll();
+    lState.pollTimer = setInterval(loadLaravelWaitRows, 8000);
+  }
+  function stopLaravelPoll() {
+    if (lState.pollTimer) { clearInterval(lState.pollTimer); lState.pollTimer = null; }
+  }
+
+  document.body.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".copy-cmd") : null;
+    if (!b) return;
+    var text = b.getAttribute("data-copy");
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(
+      function () { var t = b.textContent; b.textContent = "Copied"; setTimeout(function () { b.textContent = t === "Copied" ? "Copy" : t; }, 1500); },
+      function () { b.textContent = "Copy blocked"; });
+  });
+
+  $("lNext").addEventListener("click", async function () {
+    if (lState.step === 1) {
+      var miss = lMissingDetails();
+      $("lDetailsErr").hidden = !miss.length;
+      $("lDetailsErr").textContent = miss.length ? "Fill in: " + miss.join(", ") + "." : "";
+      if (miss.length) return;
+      if (!lState.storeId) {
+        $("lTokenNote").style.color = "var(--fail)";
+        $("lTokenNote").textContent = "Generate a token and finish the install commands above before continuing.";
+        return;
+      }
+      try {
+        var id = await ensureLaravelStore();
+        var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
+        if (res.http === 200 && res.body.can_continue) { lShowStep(2); return; }
+        $("lTokenNote").style.color = "var(--fail)";
+        $("lTokenNote").textContent = "Finish the install commands above before continuing.";
+      } catch (e) {
+        $("lTokenNote").style.color = "var(--fail)";
+        $("lTokenNote").textContent = "Could not check status: " + e.message;
+      }
+      return;
+    }
+    if (lState.step < 3) { lShowStep(lState.step + 1); return; }
+    await finishLaravelConnection();
+  });
+
+  async function runLaravelTest() {
+    var id;
+    $("lTestPanel").innerHTML = '<p class="hint">Running the 9 checks against your store…</p>';
+    try {
+      id = await ensureLaravelStore();
+      var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
+      var run = res.body;
+      var checksHtml = '<div class="card"><h3 class="card-title">Test connection</h3><div class="check-list">' +
+        run.checks.map(checkRowHtml).join("") + '</div></div>';
+      var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
+        (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
+      $("lTestPanel").innerHTML = checksHtml + dqHtml;
+      $("lNext").disabled = !run.can_continue;
+    } catch (e) {
+      $("lTestPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the test: ' + esc(e.message) + '</p>';
+    }
+  }
+
+  async function loadLaravelZones() {
+    $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint">Loading zones…</td></tr>';
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("GET", "/api/stores/" + id + "/zones");
+      if (res.http !== 200) throw new Error("HTTP " + res.http);
+      var zones = res.body.zones || [];
+      if (!zones.length) { $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint">No zones returned by GET /locations.json.</td></tr>'; return; }
+      $("lZoneRows").innerHTML = zones.map(function (z) {
+        return '<tr><td>' + esc(z.name || String(z.id)) + '</td><td>' + esc((z.areas || []).join(", ") || "—") + '</td><td>' + esc(z.min_order || "—") + '</td></tr>';
+      }).join("");
+    } catch (e) {
+      $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint" style="color:var(--fail)">Could not read zones: ' + esc(e.message) + '</td></tr>';
+    }
+  }
+
+  async function finishLaravelConnection() {
+    var btn = $("lNext");
+    btn.disabled = true;
+    $("lFinishNote").style.color = "";
+    $("lFinishNote").textContent = "Connecting…";
+    try {
+      var id = await ensureLaravelStore();
+      await backend("PUT", "/api/stores/" + id + "/delivery-settings", {
+        mode: $("lStoreType").value,
+        ask_area_when: "when_needed",
+        remember_area: $("lRemember").checked,
+      });
+      var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
+      if (res.http !== 200 || !res.body.can_continue) throw new Error("The package isn't fully connected yet.");
+      var check = await backend("POST", "/api/stores/" + id + "/chattrn/check", {});
+      if (check.body.state !== "connected") throw new Error(check.body.message || "Could not connect.");
+      $("lFinishNote").textContent = "";
+      stopLaravelPoll();
+      showList();
+      setBanner(($("lStoreName").value.trim() || "Store") + " is connected.");
+    } catch (e) {
+      $("lFinishNote").style.color = "var(--fail)";
+      $("lFinishNote").textContent = "Not connected yet: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Reopens the Laravel wizard filled with this store, for Edit connection.
+  function prefillLaravelWizard(s) {
+    resetLaravelStore();
+    $("lStoreName").value = s.name || "";
+    $("lSiteUrl").value = s.website_url || "";
+    var brand = $("lBrand");
+    if (s.brand && !Array.from(brand.options).some(function (o) { return o.value === s.brand; })) brand.add(new Option(s.brand, s.brand));
+    brand.value = s.brand || brand.options[0].value;
+    $("lStoreType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
+    lState.storeId = s.id;
+    lState.sniffed = true;
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

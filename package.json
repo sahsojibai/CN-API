@@ -1,0 +1,15 @@
+{
+  "name": "chattrn-connector-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend for Connect a custom website: endpoint checks, field mapping, test runner, zones and product reads against a store's own API.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "mock": "node src/mock-store.js",
+    "mock:chattrn": "node src/mock-chattrn-store.js",
+    "test": "node --test test/guard.test.js test/backend.test.js test/gaps.test.js test/location.test.js test/catalog.test.js"
+  }
+}
