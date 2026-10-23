@@ -90,10 +90,17 @@ test("native HTTP flow verifies both catalog pages without merchant writes", asy
     const created = await fetch(base + "/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Native", connection_type: "chattrn_api", delivery_mode: "zone", base_url: site + merchant.PREFIX, access_token: merchant.TOKEN }) });
     assert.equal(created.status, 201);
     const { id } = await created.json();
+    const post = route => fetch(`${base}/api/stores/${id}/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    assert.equal((await post("activate")).status, 409, "review cannot be bypassed");
+    assert.equal((await post("onboarding/review")).status, 200);
+    assert.equal((await post("activate")).status, 409, "verification cannot be bypassed");
     const response = await fetch(`${base}/api/stores/${id}/test-runs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     assert.equal(response.status, 200);
     const run = await response.json();
     assert.equal(run.can_continue, true, JSON.stringify(run.checks));
+    assert.equal((await post("activate")).status, 200, "current reviewed verification activates");
+    await fetch(`${base}/api/stores/${id}/delivery-settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({mode:"outlet"}) });
+    assert.equal((await post("activate")).status, 409, "changing configuration invalidates verification");
     assert.match(run.data_quality.find(c => c.label === "All pages load").message, /60 products across 2 page/);
     assert.equal(merchant.requests.filter(r => r.method !== "GET" && r.method !== "HEAD").length, 0);
   } finally {

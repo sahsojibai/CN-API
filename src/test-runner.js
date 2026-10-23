@@ -129,6 +129,7 @@ async function runTests(ctx, store, input = {}) {
     let state = "passed";
     let message = `${first5.length} of ${first5.length} checked have a price and stock. p95 ${p95} ms.`;
     if (problems.length) { state = "failed"; message = problems[0]; }
+    else if (rows.length !== ids.length) { state = "failed"; message = "Stock checks did not finish. Run verification again."; }
     else if (noStock) { state = "needs_attention"; message = `${noStock} of ${first5.length} checked have no price or stock.`; }
     else if (p95 > P95_MS) { state = "needs_attention"; message = `Slow: p95 ${p95} ms. Aim for ${P95_MS} ms or less.`; }
     checks.push({ label: "Live stock and price", state, message });
@@ -256,7 +257,7 @@ async function runTests(ctx, store, input = {}) {
     finished_at: new Date().toISOString(),
     duration_ms: Date.now() - started,
     phone: mask(input.phone),
-    can_continue: checks.some((c) => c.label === "Store profile" && c.state === "passed") && checks.some((c) => c.label === "Catalog" && c.state === "passed"),
+    can_continue: ["Store profile", "Catalog", "Live stock and price"].every(label => checks.some(c => c.label === label && c.state === "passed")) && dq.some(c => c.label === "All pages load" && c.state === "pass"),
     checks,
     data_quality: dq,
     sample_products: sampleProducts,

@@ -5,10 +5,10 @@ const assert = require("node:assert/strict");
 const { assertPublicUrl, isPrivateIp } = require("../src/http");
 
 test("private and reserved IPv4 ranges are refused", () => {
-  for (const ip of ["127.0.0.1", "10.1.2.3", "192.168.0.5", "172.16.0.1", "172.31.255.1", "169.254.1.1", "100.64.0.1", "0.0.0.0", "224.0.0.1"]) {
+  for (const ip of ["127.0.0.1", "10.1.2.3", "192.168.0.5", "172.16.0.1", "172.31.255.1", "169.254.1.1", "100.64.0.1", "0.0.0.0", "224.0.0.1", "203.0.113.5"]) {
     assert.equal(isPrivateIp(ip), true, ip);
   }
-  for (const ip of ["8.8.8.8", "172.32.0.1", "100.63.0.1", "203.0.113.5"]) {
+  for (const ip of ["8.8.8.8", "172.32.0.1", "100.63.0.1"]) {
     assert.equal(isPrivateIp(ip), false, ip);
   }
 });

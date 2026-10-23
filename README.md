@@ -147,3 +147,24 @@ From your own machine, so the store can be reached from your network:
     npm start
     # open http://localhost:3100, create a store with its base URL and sign-in method,
     # then press Find zone parameter in Delivery setup.
+
+### Consistent connection setup
+
+All three adapters use **Connect → Review → Verify → Activate**. Connection checks
+only probe the merchant; activation is explicit. API clients should save their
+mapping, POST `/api/stores/:id/onboarding/review`, POST
+`/api/stores/:id/test-runs`, then POST `/api/stores/:id/activate`. Activation
+requires a passing run for the current reviewed configuration within 15 minutes.
+Changes to credentials, endpoints, mapping or delivery mode require review and
+verification again. Endpoint diagnostic timestamps do not invalidate a review.
+
+Outbound merchant requests pin validated DNS addresses to their connections,
+refuse private/reserved destinations and redirects, limit streamed encoded and
+decoded bodies, and apply one deadline across DNS and response processing.
+Requests to the same origin share a throttle. Private-host testing is unavailable
+in production and on Render.
+
+The canonical PHP source and release CI live in
+[sahnewajsojib123/chattrn-connector](https://github.com/sahnewajsojib123/chattrn-connector).
+The former embedded package directory contains a pointer only. Backend CI tests
+Node 22/24 with PostgreSQL and checks that duplicate PHP sources do not return.

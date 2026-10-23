@@ -18,6 +18,7 @@ const CC = require("./chattrn-connector");
 const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
+const { configurationStamp, activationProblem } = require("./onboarding");
 const Drafts = require("../public/onboarding-drafts");
 const { ensurePackageReady } = require("./package-ready");
 
@@ -231,7 +232,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     if (r.bad) {
       return { body: { state: "error", http_status: r.bad.http, message: r.bad.message, duration_ms: r.res.ms } };
     }
-    s.status = "connected";
+    s.onboarding = { ...(s.onboarding || {}), connected_at: new Date().toISOString() };
     await db.put(s);
     return { body: { state: "connected", http_status: r.res.http, message: "Connected. The product list responded.", duration_ms: r.res.ms } };
   });
@@ -254,7 +255,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       s.delivery.mode = DELIVERY_MODES.includes(result.store.delivery_mode) ? result.store.delivery_mode : s.delivery.mode;
       s.chattrn.api_version = result.store.api_version;
       s.chattrn.capabilities = result.store.capabilities || {};
-      s.status = "connected";
+      s.onboarding = { ...(s.onboarding || {}), connected_at: new Date().toISOString() };
       await db.put(s);
     }
     return { body: result };
@@ -440,6 +441,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http || "unavailable"}).`);
     }
     s.laravel.last_seen_at = new Date().toISOString();
+    s.onboarding = { ...(s.onboarding || {}), mapping_saved_at: new Date().toISOString() };
     // Mapping is already committed remotely; optional metadata must not turn success into failure.
     try { await db.put(s); } catch (error) { console.warn("Mapping saved; last-seen metadata update failed", error.code || "storage_error"); }
     return { body: res.json };
@@ -615,11 +617,35 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     return { body: { ...result, context_param: s.delivery.context_param, param_confirmed: !!s.delivery.param_confirmed } };
   });
 
+  route("POST", "/api/stores/:id/onboarding/review", async ({ params }) => {
+    const s = await findStore(params.id);
+    if (s.connection_type === "mapped_api" && !M.isSaved(s, "product")) throw new HttpError(409, "mapping_required", "Save the product mapping before reviewing.");
+    if (s.connection_type === "laravel_package" && !s.onboarding?.mapping_saved_at) throw new HttpError(409, "mapping_required", "Save the package mapping before reviewing.");
+    if (s.connection_type === "chattrn_api") {
+      const check = await CC.checkStore(ctx, s);
+      if (check.state !== "connected") throw new HttpError(422, "connection_required", check.message);
+    }
+    s.onboarding = { ...(s.onboarding || {}), reviewed_at: new Date().toISOString() };
+    s.onboarding.review_stamp = configurationStamp(s);
+    await db.put(s);
+    return { body: { reviewed: true } };
+  });
+  route("POST", "/api/stores/:id/activate", async ({ params }) => {
+    const s = await findStore(params.id);
+    const problem = activationProblem(s);
+    if (problem) throw new HttpError(409, "verification_required", problem);
+    s.status = "connected";
+    s.onboarding.activated_at = new Date().toISOString();
+    await db.put(s);
+    return { body: { state: "connected", store: publicView(s) } };
+  });
+
   route("POST", "/api/stores/:id/test-runs", async ({ params, body }) => {
     const s = await findStore(params.id);
     const run = CHATTRN_LIKE.includes(s.connection_type)
       ? await runChattrnTests(ctx, s, {})
       : await runTests(ctx, s, { phone: body.phone || null, zone: body.zone ?? null, rediscover: !!body.rediscover });
+    run.configuration_stamp = configurationStamp(s);
     await db.put(s);
     return { body: run };
   });
@@ -741,6 +767,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/flow-tester")) {
         return serveFile(res, path.join(publicDir, "flow-tester.html"), "text/html; charset=utf-8");
       }
+      if (req.method === "GET" && url.pathname === "/setup-flow.js") return serveFile(res, path.join(publicDir, "setup-flow.js"), "application/javascript; charset=utf-8");
       if (req.method === "GET" && url.pathname === "/onboarding-drafts.js") {
         return serveFile(res, path.join(publicDir, "onboarding-drafts.js"), "application/javascript; charset=utf-8");
       }

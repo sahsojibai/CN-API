@@ -5,9 +5,9 @@
   "use strict";
   var KINDS = ["mapped_api", "chattrn_api", "laravel_package"];
   var FIELDS = {
-    mapped_api: ["storeName", "siteUrl", "base", "brand", "storeType", "auth", "header", "ctxName", "ctxValue"],
+    mapped_api: ["storeName", "siteUrl", "base", "brand", "storeType", "auth", "header", "ctxName", "ctxValue", "noUpdatedAt"],
     chattrn_api: ["cStoreName", "cSiteUrl", "cBase", "cBrand", "cStoreType", "cRemember"],
-    laravel_package: ["lStoreName", "lSiteUrl", "lBrand", "lStoreType"],
+    laravel_package: ["lStoreName", "lSiteUrl", "lBrand", "lStoreType", "lRemember"],
   };
   var TTL = 30 * 86400000;
   function object(v) { return v && typeof v === "object" && !Array.isArray(v); }

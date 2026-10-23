@@ -17,7 +17,7 @@ async function call(ctx, store, opts) {
   const url = path.startsWith("http") ? path : base + path;
   // Never forward merchant credentials to a pagination URL on a different origin.
   if (new URL(url).origin !== new URL(base).origin) throw new Error("Pagination URL must stay on the API origin.");
-  await throttle(store.id);
+  await throttle(new URL(url).origin);
   let token = tokenOverride;
   if (token === undefined) token = store.chattrn.access_token_enc ? decrypt(store.chattrn.access_token_enc, ctx.secretKey) : "";
   const headers = authHeaders(token);

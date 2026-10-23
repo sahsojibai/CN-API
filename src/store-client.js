@@ -20,7 +20,7 @@ async function call(ctx, store, opts) {
   if (context && context.name && context.value != null && context.value !== "") {
     url += (url.includes("?") ? "&" : "?") + encodeURIComponent(context.name) + "=" + encodeURIComponent(context.value);
   }
-  await throttle(store.id);
+  await throttle(new URL(url).origin);
   let key = keyOverride;
   if (key === undefined) key = store.auth.secret_enc ? decrypt(store.auth.secret_enc, ctx.secretKey) : "";
   return request({ url, method, headers: authHeaders(store.auth, key), timeoutMs });

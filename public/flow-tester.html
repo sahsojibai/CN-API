@@ -483,14 +483,15 @@ details summary { margin-top: 4px; }
       </section>
         <div id="chattrnWizardView" class="wizard-view" hidden>
       <header>
-        <h1 class="page-title">Chattrn API &middot; Store and API</h1>
+        <h1 class="page-title">Chattrn API &middot; Connect</h1>
         <p class="page-sub">Connect a store that already speaks the Chattrn API: the same resources and fields as Shopify's Admin REST API, read with your access token.</p>
       </header>
 
-      <div class="stepper stepper-3" aria-label="Setup steps">
-        <button type="button" class="cstep" data-cstep="1"><span class="num">1</span><span><span class="t" style="display:block">Store and API</span><span class="s">Base URL and access token</span></span></button>
-        <button type="button" class="cstep" data-cstep="2"><span class="num">2</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
-        <button type="button" class="cstep" data-cstep="3"><span class="num">3</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
+      <div class="stepper" aria-label="Setup steps">
+        <button type="button" class="cstep" data-cstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">Address and authentication</span></span></button>
+        <button type="button" class="cstep" data-cstep="2"><span class="num">2</span><span><span class="t" style="display:block">Review</span><span class="s">Mappings and capabilities</span></span></button>
+        <button type="button" class="cstep" data-cstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Read-only checks</span></span></button>
+        <button type="button" class="cstep" data-cstep="4"><span class="num">4</span><span><span class="t" style="display:block">Activate</span><span class="s">Delivery and final review</span></span></button>
       </div>
 
       <!-- STEP 1: Store and API -->
@@ -524,12 +525,13 @@ details summary { margin-top: 4px; }
       </section>
 
       <!-- STEP 2: Test connection -->
-      <section data-cpanel="2" hidden style="display:flex;flex-direction:column;gap:20px">
+      <section data-cpanel="2" hidden><div class="card"><h3>Review API capabilities</h3><p class="hint">Your API already uses the Chattrn schema. Review the advertised capabilities; verification checks which ones work. No field mapping is required.</p><div id="cReviewPanel"></div></div></section>
+      <section data-cpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
         <div id="cTestPanel"></div>
       </section>
 
       <!-- STEP 3: Delivery setup -->
-      <section data-cpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
+      <section data-cpanel="4" hidden style="display:flex;flex-direction:column;gap:20px">
         <div class="card" id="cDeliveryCard">
           <div class="card-head">
             <div><div class="sec-title">Delivery zones</div><p class="hint" style="margin-top:4px">Zones, areas and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p></div>
@@ -560,10 +562,11 @@ details summary { margin-top: 4px; }
         <p class="page-sub" id="lPageSub">One-time &mdash; exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes.</p>
       </header>
 
-      <div class="stepper stepper-3" aria-label="Setup steps">
-        <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">You are here</span></span></button>
-        <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Map your tables</span><span class="s">Next</span></span></button>
-        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Check it&rsquo;s live</span></span></button>
+      <div class="stepper" aria-label="Setup steps">
+        <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">Address and authentication</span></span></button>
+        <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Review</span><span class="s">Mappings and capabilities</span></span></button>
+        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Read-only checks</span></span></button>
+        <button type="button" class="lstep" data-lstep="4"><span class="num">4</span><span><span class="t" style="display:block">Activate</span><span class="s">Delivery and final review</span></span></button>
       </div>
 
       <!-- STEP 1: Connect -->
@@ -643,6 +646,7 @@ details summary { margin-top: 4px; }
         <div id="lVerifyPanel"><p class="hint">Running the checks against your store&hellip;</p></div>
       </section>
 
+      <section data-lpanel="4" hidden><div class="card"><h3>Delivery and activation</h3><p id="lActivationSummary" class="hint"></p><label class="opt"><input type="checkbox" id="lRemember" checked><span>Remember the customer's delivery area</span></label><p class="hint">Activation requires a successful verification of the current reviewed configuration. Unsupported write actions remain disabled.</p></div></section>
       <div class="footer" style="border:0;padding:0;margin-top:0">
         <button type="button" class="plain" id="lBack">Back</button>
         <button type="button" class="primary" id="lNext">Continue: map your tables</button>
@@ -754,6 +758,7 @@ details summary { margin-top: 4px; }
       <!-- STEP 2: Map fields -->
       <section data-panel="2" hidden>
         <div id="mapPanel" style="display:flex;flex-direction:column;gap:20px"></div>
+        <label class="opt"><input type="checkbox" id="noUpdatedAt"><span>My API has no updated timestamp. Use full catalog refreshes.</span></label>
       </section>
 
       <!-- STEP 3: Test connection -->
@@ -827,10 +832,10 @@ details summary { margin-top: 4px; }
             <div class="sec-title">When should the AI ask for the area?</div>
             <p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p>
           </div>
-          <label class="opt"><input type="radio" name="ask" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span><span class="hint" style="display:block">Order and policy questions don't need an area.</span></span></label>
-          <label class="opt"><input type="radio" name="ask"><span><span class="opt-title">At the start of every new chat</span><span class="hint" style="display:block">Simple, but adds a step for every customer.</span></span></label>
-          <label class="opt"><input type="radio" name="ask"><span><span class="opt-title">Use the area already picked on my website</span><span class="hint" style="display:block">Your website passes the area to the widget. Ask only if it's missing.</span></span></label>
-          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" checked><span class="opt-title">Remember the area for returning customers</span></label>
+          <label class="opt"><input type="radio" name="ask" value="when_needed" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span><span class="hint" style="display:block">Order and policy questions don't need an area.</span></span></label>
+          <label class="opt"><input type="radio" name="ask" value="always"><span><span class="opt-title">At the start of every new chat</span><span class="hint" style="display:block">Simple, but adds a step for every customer.</span></span></label>
+          <label class="opt"><input type="radio" name="ask" value="never"><span><span class="opt-title">Use the area already picked on my website</span><span class="hint" style="display:block">Your website passes the area to the widget. Ask only if it's missing.</span></span></label>
+          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" id="mappedRemember" checked><span class="opt-title">Remember the area for returning customers</span></label>
         </div>
       </section>
 
@@ -845,6 +850,7 @@ details summary { margin-top: 4px; }
 </div>
 
 <script src="/onboarding-drafts.js"></script>
+<script src="/setup-flow.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1575,13 +1581,13 @@ details summary { margin-top: 4px; }
     ],
     variant: [
       { key: "vid", label: "Variant ID", chattrn: "variant.id", level: "required", syn: ["id", "variantid"] },
-      { key: "vtitle", label: "Variant title", chattrn: "variant.title", level: "required", syn: ["title", "name", "variantname", "label"] },
+      { key: "vtitle", label: "Variant title", chattrn: "variant.title", level: "required", syn: ["title", "name", "variantname", "label", "optionvalue"] },
       { key: "vprice", label: "Variant price", chattrn: "variant.price", level: "required", money: true,
         syn: ["sellprice", "sellingprice", "discountprice", "price"], fallbackSyn: ["price"] },
       { key: "vcompare", label: "Variant was price", chattrn: "variant.compare_at_price", level: "optional", money: true,
         syn: ["compareprice", "compareatprice", "originalprice"] },
       { key: "vstock", label: "Variant stock", chattrn: "variant.inventory_quantity", level: "required",
-        syn: ["stock", "quantity", "available", "inventoryquantity", "totalstock"] },
+        syn: ["stock", "stockqty", "quantity", "available", "inventoryquantity", "totalstock"] },
       { key: "vsku", label: "SKU", chattrn: "variant.sku", level: "optional", syn: ["sku", "code"] },
       { key: "vinv", label: "Inventory item ID", chattrn: "variant.inventory_item_id", level: "recommended", syn: ["inventoryitemid", "inventoryid"] }
     ],
@@ -1894,33 +1900,88 @@ details summary { margin-top: 4px; }
       var slot = s.getAttribute("data-slot");
       if (!state.map[scope][key]) state.map[scope][key] = { primary: "", fallback: "" };
       state.map[scope][key][slot] = s.value;
+      state.progress.reviewed = false; state.progress.verified = false;
+      ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
       renderMap();
       // The Product data table reads the same mapping, so it updates with each change.
       renderProducts();
     });
   }
 
+  async function saveDeliverySettings(id, settings) {
+    var result = await backend("PUT", "/api/stores/" + id + "/delivery-settings", settings);
+    if (result.http !== 200) throw new Error(result.body.error?.message || "Could not save delivery settings.");
+  }
+
+  async function recordSetupReview(id) {
+    var res = await backend("POST", "/api/stores/" + id + "/onboarding/review", {});
+    if (res.http !== 200) throw new Error(res.body.error?.message || "Could not record the review.");
+  }
+  function renderNativeReview() {
+    var caps = cState.capabilities || {};
+    $("cReviewPanel").innerHTML = Object.keys(caps).map(function(key) { return checkRowHtml({label:key,state:caps[key] ? "capability_only" : "not_supported",message:caps[key] ? "Advertised by your API; verification follows." : "This capability is unavailable."}); }).join("");
+  }
+  async function prepareMappedConnection() {
+    var id = await ensureBackendStore();
+    for (var row of ROWS.filter(function(r) { return ["products","detail","search","zones"].includes(r.id); })) {
+      var response = await backend("PUT", "/api/stores/" + id + "/endpoints/" + row.id, { path: row.path });
+      if (response.http !== 200) throw new Error(response.body.error?.message || "Check the endpoint paths.");
+    }
+    var check = await backend("POST", "/api/stores/" + id + "/endpoints/products/check", { zone: state.ctxValue || null });
+    if (check.http !== 200 || check.body.state !== "responded") throw new Error(check.body.summary || check.body.message || "The product endpoint must respond before reviewing.");
+    var saved = await backend("GET", "/api/stores/" + id);
+    state.products = saved.body.samples?.product || [];
+    if (!state.products.length) throw new Error("The product endpoint returned no samples. Check its path and delivery context.");
+    return id;
+  }
+  async function saveMappedReview() {
+    var id = await ensureBackendStore();
+    var aliases = { product: { compare_at_price:"compare", images:"image", updated_at:"updated" }, variant: {id:"vid",title:"vtitle",price:"vprice",compare_at_price:"vcompare",stock:"vstock",sku:"vsku",inventory_item_id:"vinv"} };
+    for (var resource of ["product", "variant"]) {
+      if (resource === "variant" && !recordsFor("variant").length) continue;
+      var proposal = await backend("POST", "/api/stores/" + id + "/mapping/propose", {resource:resource});
+      if (proposal.http !== 200) throw new Error(proposal.body.error?.message || "Could not load mapping fields.");
+      var rows = proposal.body.rows.map(function(row) {
+        var key = aliases[resource][row.key] || row.key;
+        var chosen = state.map[resource]?.[key];
+        return {key:row.key,source_path:chosen ? chosen.primary || null : row.source_path,fallback_path:chosen?.fallback || null,confirmed:true,
+          not_in_store:resource === "product" && row.key === "updated_at" && $("noUpdatedAt").checked};
+      });
+      var result = await backend("PUT", "/api/stores/" + id + "/mapping", {resource:resource,rows:rows});
+      if (result.http !== 200) throw new Error(result.body.error?.message || "Review required mapping fields.");
+    }
+    await recordSetupReview(id);
+  }
+  async function runMappedVerification() {
+    state.progress.verified = false; $("next").disabled = true;
+    $("testPanel").innerHTML = '<p class="hint">Verifying the saved mapping through Chattrn…</p>';
+    try {
+      var res = await backend("POST", "/api/stores/" + await ensureBackendStore() + "/test-runs", {zone:state.ctxValue || null});
+      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
+      state.progress.verified = res.body.can_continue === true;
+      $("testPanel").innerHTML = '<div class="card">' + res.body.checks.map(checkRowHtml).join("") + '<button type="button" id="runAgain">Run verification again</button></div>';
+      ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
+    } catch(e) { $("testPanel").textContent = e.message; }
+    finally { $("next").disabled = !state.progress.verified; }
+  }
   // ---- Steps -------------------------------------------------------------
-  var STEP_NEXT = ["Continue: map fields with AI", "Save mapping and test connection", "Continue: delivery setup", "Finish and connect store"];
+  var STEP_NEXT = ChattrnSetup.steps.map(function (s) { return s.next; });
   var STEP_SUB = ["Endpoints and sign-in", "Suggested matches, you check", "Data and speed", "Where you deliver"];
   function showStep(n) {
-    state.step = Math.max(1, Math.min(4, n));
+    state.progress = state.progress || {};
+    state.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(state.progress)));
     queueDraftSave();
     document.querySelectorAll("[data-panel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-panel")) !== state.step;
     });
-    document.querySelectorAll(".step").forEach(function (b) {
-      var i = Number(b.getAttribute("data-step"));
-      b.classList.toggle("on", i === state.step);
-      b.classList.toggle("done", i < state.step);
-      b.querySelector(".num").textContent = i < state.step ? "✓" : String(i);
-      b.querySelector(".s").textContent = i < state.step ? "Edit" : i === state.step ? "You are here" : STEP_SUB[i - 1];
-    });
+    ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
     $("back").disabled = state.step === 1;
     $("next").textContent = STEP_NEXT[state.step - 1];
     if (state.step === 1) renderProducts();
-    if (state.step === 2) renderMap();
-    if (state.step === 3) renderTestPanel();
+    if (state.step === 2) {
+      renderMap();
+    }
+    if (state.step === 3) runMappedVerification();
   }
 
   function setMode(m) {
@@ -1995,7 +2056,7 @@ details summary { margin-top: 4px; }
     return state.storeId;
   }
 
-  function resetBackendStore() { state.storeId = null; }
+  function resetBackendStore() { state.storeId = null; state.progress = {}; }
 
   function init() {
     buildRows();
@@ -2018,15 +2079,20 @@ details summary { margin-top: 4px; }
     if (!$("storeType").value) m.push("Store Type");
     return m;
   }
-  $("next").addEventListener("click", function () {
-    if (state.step === 1) {
-      var miss = missingDetails();
-      $("detailsErr").hidden = !miss.length;
-      $("detailsErr").textContent = miss.length ? "Fill in: " + miss.join(", ") + "." : "";
-      if (miss.length) return;
-    }
-    if (state.step < 4) { showStep(state.step + 1); return; }
-    finishConnection();
+  $("next").addEventListener("click", async function () {
+    var button = this; button.disabled = true;
+    $("detailsErr").hidden = true; $("finishNote").textContent = "";
+    try {
+      if (state.step === 1) {
+        var miss = missingDetails(); if (miss.length) throw new Error("Fill in: " + miss.join(", "));
+        await prepareMappedConnection(); state.progress.connected = true; showStep(2);
+      } else if (state.step === 2) {
+        await saveMappedReview(); state.progress.reviewed = true; showStep(3);
+      } else if (state.step === 3) {
+        if (!state.progress.verified) throw new Error("Verification must pass before activation."); showStep(4);
+      } else await finishConnection();
+    } catch(e) { $("detailsErr").hidden = false; $("detailsErr").textContent = e.message; $("finishNote").textContent = e.message; }
+    finally { button.disabled = state.step === 3 && !state.progress.verified; }
   });
   $("storeType").addEventListener("change", function () { setMode($("storeType").value); resetBackendStore(); });
   ["base", "auth", "header", "key", "siteUrl"].forEach(function (id) {
@@ -2092,7 +2158,7 @@ details summary { margin-top: 4px; }
   $("askText").addEventListener("keydown", function (e) { if (e.key === "Enter") askOpen(); });
   wireMap();
   $("testPanel").addEventListener("click", function (e) {
-    if (e.target.closest && e.target.closest("#runAgain")) testAll();
+    if (e.target.closest && e.target.closest("#runAgain")) runMappedVerification();
   });
   $("auth").addEventListener("change", function () {
     var none = $("auth").value === "none";
@@ -2265,9 +2331,14 @@ details summary { margin-top: 4px; }
     $("finishNote").textContent = "Checking the connection…";
     try {
       var id = await ensureBackendStore();
-      var res = await backend("POST", "/api/stores/" + id + "/connection/check", {});
+      await saveDeliverySettings(id, {
+        mode: $("storeType").value,
+        ask_area_when: document.querySelector('input[name="ask"]:checked').value,
+        remember_area: $("mappedRemember").checked,
+      });
+      var res = await backend("POST", "/api/stores/" + id + "/activate", {});
       if (res.http !== 200 || res.body.state !== "connected") {
-        throw new Error(res.body.message || ("HTTP " + res.http));
+        throw new Error(res.body.error?.message || res.body.message || ("HTTP " + res.http));
       }
       $("finishNote").textContent = "";
       await clearSetupDraft("mapped_api", id);
@@ -2541,10 +2612,10 @@ details summary { margin-top: 4px; }
 
   // ---- Chattrn API wizard (native connector, slice 1B: Store and API -> Test connection -> Delivery setup) ----
   var cState = { step: 1, storeId: null };
-  var CSTEP_NEXT = ["Continue: test connection", "Continue: delivery setup", "Finish and connect store"];
+  var CSTEP_NEXT = STEP_NEXT;
   var CSTEP_SUB = ["Base URL and access token", "Data and speed", "Where you deliver"];
 
-  function resetChattrnStore() { cState.storeId = null; }
+  function resetChattrnStore() { cState.storeId = null; cState.progress = {}; }
 
   function showChattrnWizard() {
     setCrumbStore("");
@@ -2555,22 +2626,18 @@ details summary { margin-top: 4px; }
   }
 
   function cShowStep(n) {
-    cState.step = Math.max(1, Math.min(3, n));
+    cState.progress = cState.progress || {};
+    cState.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(cState.progress)));
     queueDraftSave();
     document.querySelectorAll("[data-cpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-cpanel")) !== cState.step;
     });
-    document.querySelectorAll(".cstep").forEach(function (b) {
-      var i = Number(b.getAttribute("data-cstep"));
-      b.classList.toggle("on", i === cState.step);
-      b.classList.toggle("done", i < cState.step);
-      b.querySelector(".num").textContent = i < cState.step ? "✓" : String(i);
-      b.querySelector(".s").textContent = i < cState.step ? "Edit" : i === cState.step ? "You are here" : CSTEP_SUB[i - 1];
-    });
+    ChattrnSetup.render(document.querySelectorAll(".cstep"), cState.step, cState.progress);
     $("cBack").disabled = cState.step === 1;
     $("cNext").textContent = CSTEP_NEXT[cState.step - 1];
-    if (cState.step === 2) runChattrnTest();
-    if (cState.step === 3) loadChattrnZones();
+    if (cState.step === 2) renderNativeReview();
+    if (cState.step === 3) runChattrnTest();
+    if (cState.step === 4) loadChattrnZones();
   }
   document.querySelectorAll(".cstep").forEach(function (b) {
     b.addEventListener("click", function () { if (Number(b.getAttribute("data-cstep")) <= cState.step) cShowStep(Number(b.getAttribute("data-cstep"))); });
@@ -2624,6 +2691,8 @@ details summary { margin-top: 4px; }
         var result = await chattrnCheck();
         if (result.state !== "connected") throw new Error(result.message || "Could not connect.");
         $("cCheckMsg").textContent = result.message || "Connected.";
+        cState.progress = { connected: true }; cState.capabilities = result.store?.capabilities || {};
+        $("cStoreType").value = result.store.delivery_mode;
         cShowStep(2);
       } catch (e) {
         $("cCheckMsg").style.color = "var(--fail)";
@@ -2633,7 +2702,14 @@ details summary { margin-top: 4px; }
       }
       return;
     }
-    if (cState.step < 3) { cShowStep(cState.step + 1); return; }
+    if (cState.step === 2) {
+      btn.disabled = true;
+      try { await recordSetupReview(await ensureChattrnStore()); cState.progress.reviewed = true; cShowStep(3); }
+      catch(e) { $("cFinishNote").textContent = e.message; }
+      finally { btn.disabled = cState.step === 3 && !cState.progress.verified; }
+      return;
+    }
+    if (cState.step === 3) { if (cState.progress.verified) cShowStep(4); return; }
     await finishChattrnConnection();
   });
 
@@ -2647,18 +2723,22 @@ details summary { margin-top: 4px; }
 
   async function runChattrnTest() {
     var id;
+    cState.progress.verified = false; $("cNext").disabled = true;
     $("cTestPanel").innerHTML = '<p class="hint">Running the 9 checks against your store…</p>';
     try {
       id = await ensureChattrnStore();
       var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
-      var run = res.body;
+      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
+      if (cState.step !== 3 || cState.storeId !== id) return;
+      var run = res.body; cState.progress.verified = run.can_continue === true;
+      ChattrnSetup.render(document.querySelectorAll(".cstep"), cState.step, cState.progress);
       var checksHtml = '<div class="card"><h3 class="card-title">Test connection</h3><div class="check-list">' +
         run.checks.map(checkRowHtml).join("") + '</div></div>';
       var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
         (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
       $("cTestPanel").innerHTML = checksHtml + dqHtml;
       $("cNext").disabled = !run.can_continue;
-      if (!run.can_continue) $("cCheckMsg").textContent = "Store profile and Catalog must pass before continuing.";
+      if (!run.can_continue) $("cCheckMsg").textContent = "Required connection checks must pass before continuing.";
     } catch (e) {
       $("cTestPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the test: ' + esc(e.message) + '</p>';
     }
@@ -2687,13 +2767,14 @@ details summary { margin-top: 4px; }
     $("cFinishNote").textContent = "Connecting…";
     try {
       var id = await ensureChattrnStore();
-      await backend("PUT", "/api/stores/" + id + "/delivery-settings", {
+      await saveDeliverySettings(id, {
         mode: $("cStoreType").value,
         ask_area_when: "when_needed",
         remember_area: $("cRemember").checked,
       });
-      var result = await chattrnCheck();
-      if (result.state !== "connected") throw new Error(result.message || "Could not connect.");
+      var activation = await backend("POST", "/api/stores/" + id + "/activate", {});
+      var result = activation.body;
+      if (activation.http !== 200 || result.state !== "connected") throw new Error(result.error?.message || result.message || "Could not activate.");
       $("cFinishNote").textContent = "";
       await clearSetupDraft("chattrn_api", id);
       showList();
@@ -2722,11 +2803,11 @@ details summary { margin-top: 4px; }
 
   // ---- Laravel package wizard (slice 3: Connect -> Map your tables -> Verify) ----
   var lState = { step: 1, storeId: null, sniffed: false, pollTimer: null, registered: false, mapCards: null };
-  var LSTEP_NEXT = ["Continue: map your tables", "Save mapping & continue", "Go to Chattrn dashboard"];
+  var LSTEP_NEXT = STEP_NEXT;
   var LSTEP_SUB = ["Composer and artisan commands", "Next", "Check it's live"];
   var LSTEP_DONE = ["Token exchanged", "Mapping saved", ""];
 
-  function resetLaravelStore() { $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
+  function resetLaravelStore() { lState.progress = {}; $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
 
   function showLaravelWizard() {
     setCrumbStore("");
@@ -2741,25 +2822,20 @@ details summary { margin-top: 4px; }
   }
 
   var LSTEP_TITLE = [
-    ["Register with Chattrn", "One-time — exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes."],
-    ["Map your store", "Fields are pre-filled with best guesses from your app's actual tables. Fix anything wrong — changes save straight to the database, no redeploy needed."],
-    ["Verify your setup", "Chattrn pulls real products and orders through your mapping and checks the data, so you can see exactly what it will see."],
+    ["Connect your Laravel store", "One-time — exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes."],
+    ["Review your store mapping", "Fields are pre-filled with best guesses from your app's actual tables. Fix anything wrong — changes save straight to the database, no redeploy needed."],
+    ["Verify your connection", "Chattrn checks real responses through your saved mapping without changing live orders."],
+    ["Activate your connection", "Review delivery settings and activate the verified connection."],
   ];
 
   function lShowStep(n) {
-    lState.step = Math.max(1, Math.min(3, n));
+    lState.progress = lState.progress || {};
+    lState.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(lState.progress)));
     queueDraftSave();
     document.querySelectorAll("[data-lpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-lpanel")) !== lState.step;
     });
-    document.querySelectorAll(".lstep").forEach(function (b) {
-      var i = Number(b.getAttribute("data-lstep"));
-      var done = i < lState.step;
-      b.classList.toggle("on", i === lState.step);
-      b.classList.toggle("done", done);
-      b.querySelector(".num").textContent = done ? "✓" : String(i);
-      b.querySelector(".s").textContent = done ? LSTEP_DONE[i - 1] : i === lState.step ? "You are here" : LSTEP_SUB[i - 1];
-    });
+    ChattrnSetup.render(document.querySelectorAll(".lstep"), lState.step, lState.progress);
     $("lPageTitle").textContent = LSTEP_TITLE[lState.step - 1][0];
     $("lPageSub").textContent = LSTEP_TITLE[lState.step - 1][1];
     $("lBack").disabled = lState.step === 1;
@@ -2773,6 +2849,7 @@ details summary { margin-top: 4px; }
     }
     if (lState.step === 2) loadLaravelTables();
     if (lState.step === 3) runLaravelVerify();
+    if (lState.step === 4) $("lActivationSummary").textContent = "Delivery mode: " + $("lStoreType").value + ". Review complete; activate to finish.";
   }
   document.querySelectorAll(".lstep").forEach(function (b) {
     b.addEventListener("click", function () { if (Number(b.getAttribute("data-lstep")) <= lState.step) lShowStep(Number(b.getAttribute("data-lstep"))); });
@@ -3109,6 +3186,8 @@ details summary { margin-top: 4px; }
   }
   $("lMapPanel").addEventListener("change", function (event) {
     var key = event.target.getAttribute("data-lmkey") || "";
+    lState.progress.reviewed = false; lState.progress.verified = false;
+    ChattrnSetup.render(document.querySelectorAll(".lstep"), lState.step, lState.progress);
     if (event.target.tagName === "SELECT" && key) refreshLaravelDraft();
   });
 
@@ -3196,6 +3275,7 @@ details summary { margin-top: 4px; }
   }
 
   async function runLaravelVerify() {
+    lState.progress.verified = false; $("lNext").disabled = true;
     $("lVerifyPanel").innerHTML = '<p class="hint">Running the checks against your store…</p>';
     try {
       var id = await ensureLaravelStore();
@@ -3218,6 +3298,8 @@ details summary { margin-top: 4px; }
       } catch (e) { previewError = e.message; }
 
       var verificationPassed = run.can_continue === true;
+      lState.progress.verified = verificationPassed;
+      ChattrnSetup.render(document.querySelectorAll(".lstep"), lState.step, lState.progress);
       var banner = '<div class="banner ' + (verificationPassed ? 'ok' : '') + '">' +
         '<span class="ico ico-pass big">&#10003;</span>' +
         '<div class="banner-body"><strong>' + (verificationPassed ? 'Connection verified' : 'Paired — verification needs attention') + '</strong>' +
@@ -3241,7 +3323,7 @@ details summary { margin-top: 4px; }
       $("lVerifyPanel").innerHTML = banner + testCard + dqCard + sampleCard;
       var rerun = $("lRerun");
       if (rerun) rerun.addEventListener("click", runLaravelVerify);
-      $("lNext").disabled = run.can_continue === false;
+      $("lNext").disabled = !verificationPassed;
     } catch (e) {
       $("lVerifyPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the checks: ' + esc(e.message) + "</p>";
     }
@@ -3261,7 +3343,7 @@ details summary { margin-top: 4px; }
       try {
         var id = await ensureLaravelStore();
         var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
-        if (res.http === 200 && res.body.can_continue) { lShowStep(2); return; }
+        if (res.http === 200 && res.body.can_continue) { lState.progress.connected = true; lShowStep(2); return; }
         $("lTokenNote").style.color = "var(--fail)";
         $("lTokenNote").textContent = "Finish the install commands above before continuing.";
       } catch (e) {
@@ -3277,16 +3359,19 @@ details summary { margin-top: 4px; }
       $("lFinishNote").textContent = "Connecting to your store and saving… Free hosting may take up to a minute to wake up.";
       try {
         await saveLaravelMapping();
+        await recordSetupReview(await ensureLaravelStore());
+        lState.progress.reviewed = true;
         $("lFinishNote").textContent = "";
         lShowStep(3);
       } catch (e) {
         $("lFinishNote").style.color = "var(--fail)";
         $("lFinishNote").textContent = "Could not save the mapping: " + e.message;
       } finally {
-        btn.disabled = false;
+        btn.disabled = lState.step === 3 && !lState.progress.verified;
       }
       return;
     }
+    if (lState.step === 3) { if (lState.progress.verified) lShowStep(4); return; }
     await finishLaravelConnection();
   });
 
@@ -3297,15 +3382,15 @@ details summary { margin-top: 4px; }
     $("lFinishNote").textContent = "Connecting…";
     try {
       var id = await ensureLaravelStore();
-      await backend("PUT", "/api/stores/" + id + "/delivery-settings", {
+      await saveDeliverySettings(id, {
         mode: $("lStoreType").value,
         ask_area_when: "when_needed",
-        remember_area: true,
+        remember_area: $("lRemember").checked,
       });
       var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
       if (res.http !== 200 || !res.body.can_continue) throw new Error("The package isn't fully connected yet.");
-      var check = await backend("POST", "/api/stores/" + id + "/chattrn/check", {});
-      if (check.body.state !== "connected") throw new Error(check.body.message || "Could not connect.");
+      var check = await backend("POST", "/api/stores/" + id + "/activate", {});
+      if (check.http !== 200 || check.body.state !== "connected") throw new Error(check.body.error?.message || check.body.message || "Could not activate.");
       $("lFinishNote").textContent = "";
       stopLaravelPoll();
       await clearSetupDraft("laravel_package", id);
@@ -3329,6 +3414,7 @@ details summary { margin-top: 4px; }
     brand.value = s.brand || brand.options[0].value;
     $("lStoreType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
     lState.storeId = s.id;
+    lState.progress = { connected: !!s.laravel?.registered_at };
     lState.pendingToken = !!s.laravel?.token_pending;
     lState.sniffed = true;
   }
