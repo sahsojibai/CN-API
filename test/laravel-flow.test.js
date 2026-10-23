@@ -85,7 +85,7 @@ test("Laravel pairing before mapping, validation errors, and native product prev
     const preview = await api("GET", `/api/stores/${id}/products`);
     assert.equal(preview.status, 200);
     assert.equal(preview.body.products[0].title, "Phone");
-    assert.equal(preview.body.products[0].variants[0].stock, 3);
+    assert.equal(preview.body.products[0].variants[0].stock, null);
     assert.equal(preview.body.products[0].images[0], "https://store.test/phone.jpg");
     const pairedAgain = await api("POST", "/package/register", { token: reconnect.body.token, registration_id: "33333333-3333-4333-8333-333333333333", site_url: site, route_prefix: "/chattrn/api/2026-10" });
     assert.equal(pairedAgain.status, 200);

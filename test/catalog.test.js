@@ -44,6 +44,18 @@ test("catalog is not readable before the sync", async () => {
   } finally { s.close(); }
 });
 
+async function syncAll(api,id) {
+  const response = await api("POST", `/api/stores/${id}/catalog/sync`, {});
+  assert.equal(response.status,202);
+  for (let i=0;i<400;i++) {
+    const result = await api("GET", `/api/stores/${id}/catalog/status`);
+    if (result.body.status === "complete") return {body:{...result.body,ok:true,zones_checked:result.body.locations_done}};
+    if (["partial","stale"].includes(result.body.status)) throw new Error(JSON.stringify(result.body));
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  throw new Error("Catalog did not finish");
+}
+
 // Saves the product mapping (updated_at marked as not in the store), as Map fields does.
 async function saveProductMapping(api, id) {
   await api("POST", `/api/stores/${id}/endpoints/products/check`, {});
@@ -56,7 +68,7 @@ test("sync saves the product field mapping itself when none is saved", async () 
   const s = await startStack({ zoneRequired: true });
   try {
     const id = await s.create();
-    const r = await s.api("POST", `/api/stores/${id}/catalog/sync`, {});
+    const r = await syncAll(s.api,id);
     assert.equal(r.body.ok, true);
     const m = await s.api("GET", `/api/stores/${id}/mapping?resource=product`);
     assert.ok(m.body.current || m.body.versions, "mapping saved");
@@ -68,7 +80,7 @@ test("sync reads every zone and tags each product with its zone", async () => {
   try {
     const id = await s.create();
     await saveProductMapping(s.api, id);
-    const sync = await s.api("POST", `/api/stores/${id}/catalog/sync`, {});
+    const sync = await syncAll(s.api,id);
     assert.equal(sync.body.ok, true);
     assert.equal(sync.body.zones_checked, 48);
     assert.equal(sync.body.products_total, 600);
@@ -80,7 +92,7 @@ test("a customer's zone filters the synced products at question time", async () 
   try {
     const id = await s.create();
     await saveProductMapping(s.api, id);
-    await s.api("POST", `/api/stores/${id}/catalog/sync`, {});
+    await syncAll(s.api,id);
     // Zone 100 holds products 0, 48, 96 ... of the 600 in the mock (every 48th): 13 of them.
     const z = await s.api("GET", `/api/stores/${id}/catalog?zone=100`);
     assert.equal(z.body.count, 13);

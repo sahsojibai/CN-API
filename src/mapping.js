@@ -16,6 +16,7 @@ const FIELDS = {
   product: [
     { key: "id", label: "Product ID", chattrn: "product.id", level: "required", type: "scalar", syn: ["id", "productid", "product_id", "productno"] },
     { key: "title", label: "Title", chattrn: "product.title", level: "required", type: "text", syn: ["title", "name", "productname", "product_name"] },
+    { key: "description", label: "Description", chattrn: "product.description", level: "optional", type: "text", syn: ["description", "bodyhtml", "body_html", "details", "shortdescription"] },
     { key: "price", label: "Selling price", chattrn: "product.price", level: "required", type: "money", syn: ["price", "sellprice", "saleprice", "sellingprice", "currentprice", "unitprice"] },
     { key: "compare_at_price", label: "Was price", chattrn: "product.compare_at_price", level: "optional", type: "money", syn: ["compareprice", "compareatprice", "wasprice", "originalprice", "listprice", "msrp", "regularprice"] },
     { key: "currency", label: "Currency", chattrn: "product.currency", level: "recommended", type: "text", syn: ["currency", "currencycode"] },
@@ -365,7 +366,7 @@ function toProduct(store, raw) {
   const rows = currentRows(store, "product");
   const out = {
     id: null, title: null, price: null, compare_at_price: null, currency: store.currency || null,
-    stock: null, images: [], updated_at: null, vendor: null, variants: [],
+    stock: null, images: [], updated_at: null, vendor: null, description: null, variants: [],
   };
   for (const r of rows) {
     if (!r.source_path || r.key === "variants") continue;
@@ -373,6 +374,7 @@ function toProduct(store, raw) {
     switch (r.key) {
       case "id": out.id = v == null ? null : String(v); break;
       case "title": out.title = v == null ? null : String(v); break;
+      case "description": out.description = v == null ? null : String(v); break;
       case "price": out.price = toMoney(v); break;
       case "compare_at_price": out.compare_at_price = toMoney(v); break;
       case "currency": if (v) out.currency = String(v).toUpperCase(); break;

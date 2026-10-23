@@ -4,6 +4,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { assertBrandAvailable } = require("./brands");
+const { configurationStamp } = require("./onboarding");
+const { HttpError } = require("./http");
 
 class Db {
   constructor(file) {
@@ -29,7 +31,31 @@ class Db {
     return store ? structuredClone(store) : null;
   }
 
-  put(store) {
+  pendingCatalogJobs() {
+    return Object.values(this.data.stores).filter(s => ["queued", "running"].includes(s.catalog_sync?.status) ||
+      (!s.catalog_sync && s.status === "connected" && (s.base_url || s.chattrn?.base_url)) ||
+      (s.status === "connected" && s.catalog_sync?.status === "complete" && Date.parse(s.catalog_sync.next_sync_at) <= Date.now())).map(s => s.id);
+  }
+
+  putCatalog(store) {
+    const current = this.data.stores[store.id];
+    if (!current || current.status !== store.status || current.catalog_sync?.id !== store.catalog_sync?.id || configurationStamp(current) !== configurationStamp(store)) {
+      throw new HttpError(409, "store_changed", "Store changed during the catalog checkpoint.");
+    }
+    const next = structuredClone(current);
+    for (const key of ["catalog", "catalog_build", "catalog_sync"]) {
+      if (store[key] === undefined) delete next[key]; else next[key] = structuredClone(store[key]);
+    }
+    return this.put(next, { catalog: true });
+  }
+
+  put(store, { catalog = false } = {}) {
+    const current = this.data.stores[store.id];
+    if (!catalog && current) {
+      for (const key of ["catalog", "catalog_build", "catalog_sync"]) {
+        if (current[key] === undefined) delete store[key]; else store[key] = structuredClone(current[key]);
+      }
+    }
     if (store.status === "connected") assertBrandAvailable(Object.values(this.data.stores), store, { required: true });
     store.updated_at = new Date().toISOString();
     this.data.stores[store.id] = structuredClone(store);
@@ -45,8 +71,14 @@ class Db {
 }
 
 function publicView(store) {
-  const { auth, chattrn, laravel, onboarding_draft, ...rest } = store;
+  const { auth, chattrn, laravel, onboarding_draft, catalog_build, ...rest } = store;
   const out = { ...rest };
+  if (store.catalog) out.catalog = { ...store.catalog, products_total: store.catalog.products_total ?? store.catalog.products.length, products: store.catalog.products.slice(0, 20) };
+  if (store.catalog_sync) {
+    const job = store.catalog_sync;
+    out.catalog_sync = { id: job.id, status: job.status, phase: job.phase, locations_done: job.locations_done, error: job.error,
+      products_total: job.products_total ?? (catalog_build || store.catalog)?.products?.length ?? 0, next_sync_at: job.next_sync_at, plan: job.plan && { locations: job.plan.locations } };
+  }
   if (onboarding_draft) out.onboarding_draft_saved_at = onboarding_draft.saved_at;
   if (auth) out.auth = { mode: auth.mode, header: auth.header || null, key_saved: !!auth.secret_enc };
   if (chattrn) out.chattrn = { base_url: chattrn.base_url, api_version: chattrn.api_version || null, capabilities: chattrn.capabilities || null, token_saved: !!chattrn.access_token_enc };

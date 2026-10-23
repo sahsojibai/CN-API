@@ -162,13 +162,14 @@ test("save variant mapping from the first product's variants", async () => {
   assert.equal(r.status, 200);
 });
 
-test("products endpoint returns canonical items with decimal money strings", async () => {
+test("unscoped preview keeps canonical identities without claiming a location price", async () => {
   const r = await api("GET", `/api/stores/${storeId}/products?page=1`);
   assert.equal(r.status, 200);
   assert.equal(r.body.count, 20);
   const first = r.body.products[0];
   assert.equal(first.id, "5000");
-  assert.equal(first.price, "100.00");
+  assert.equal(first.price, null);
+  assert.equal(r.body.location_required, true);
   assert.equal(first.variants.length, 2);
   assert.equal(first.variants[0].title, "Red");
   assert.equal(first.images.length, 1);
@@ -217,7 +218,7 @@ test("test run: passes the checks on the mock and makes no write calls", async (
   assert.equal(dq("Variants have their own stock").state, "pass");
   assert.equal(dq("Images load").state, "pass");
   assert.equal(dq("All pages load").state, "pass");
-  assert.equal(r.body.sample_products.length, 3);
+  assert.ok(r.body.sample_products.length > 0 && r.body.sample_products.length <= 3);
   assert.equal(mock.requests.some((x) => ["POST", "PUT", "PATCH", "DELETE"].includes(x.method)), false);
 });
 

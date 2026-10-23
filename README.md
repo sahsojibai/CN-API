@@ -201,3 +201,56 @@ connections. This standalone tester's seeded brands are connection identities;
 they do not provision AI agents or knowledge bases in an external Chattrn account.
 When integrating with Chattrn's brand directory, use its immutable brand IDs as
 this identity, retaining the database uniqueness rule.
+
+### Whole-store catalog and customer location
+
+Connecting a store never picks a customer's zone/outlet. Mapped endpoint checks
+find representative samples automatically, scanning beyond empty locations with a
+bounded, resumable discovery cursor. A sample location is diagnostic only; legacy
+`delivery.zone_value` defaults are ignored. Verification reports sample coverage
+separately from the full catalog import.
+
+After a reviewed connection passes verification, a durable catalog job imports all
+locations and every product page. Existing connected stores bootstrap an import on
+startup. Native Chattrn API and Laravel connections import the global catalog once,
+then read inventory in batches for every location. Mapped APIs with a discovered
+location parameter traverse every location. Products are deduplicated by ID; prices,
+stock and variant offers are stored separately by location. Descriptions and common
+product information are retained once rather than copied into every offer.
+
+- `POST /api/stores/:id/catalog/sync` returns **202**, not a synchronous completion
+  result. `{ "retry": true }` resumes failed work; completed locations are retained.
+- `GET /api/stores/:id/catalog/status` reports phase, product count, location coverage,
+  failures and completion. Partial, stale and interrupted imports never claim complete.
+- `GET /api/stores/:id/catalog?limit=50&offset=0` pages through the union. The response
+  includes `next_offset`; `?zone=ID` selects a cached location snapshot. Cached offers
+  are diagnostic snapshots, not live customer quotes.
+- `POST /api/stores/:id/product-lookup` accepts `{ "query": "Do you have rice?" }`.
+  Without a location it returns shared information and a location question with
+  location-dependent price/stock withheld. Add `location_id` or an unambiguous `area`
+  to get live detail/inventory reads. Failures never fall back to cached stock.
+  Unknown inventory remains null rather than inheriting another location's quantity.
+
+The caller stores a customer's location on that conversation and passes it to each
+lookup. This repo supplies the lookup contract and tester, not a separate production
+AI Agent or inbox service. One-store-per-brand enforcement is unchanged.
+
+Jobs checkpoint pages and inventory batches in PostgreSQL, use leases and a separate
+catalog revision, and survive restarts without overwriting merchant edits. A crashed
+lease can take up to two minutes to expire. Three bounded failures pause work for an
+explicit retry. Connected stores refresh hourly while the web service is running.
+Render Free sleeping pauses work; it resumes on wake/startup. This does not provide
+an always-on worker guarantee. No additional Render service or environment variable
+is required by this implementation.
+
+Current snapshot limits are 100,000 unique products, 10,000 product pages and 32 MB.
+Exceeding a limit is reported as an incomplete import. Listing stores excludes bulk
+catalog/build data. The previous completed snapshot is retained during refresh;
+partial builds remain explicitly marked incomplete.
+
+Connector 1.3.1 adds `location_prices` capability and optional `price` /
+`compare_at_price` inventory-level fields. These preserve location-specific prices
+from the configured inventory model. Flat product stock works without a separate
+Variant model and is only returned for the default location. Older native APIs that
+only expose global product prices retain that contract; location-dependent prices
+must be exposed explicitly, never inferred from a primary-location sample.

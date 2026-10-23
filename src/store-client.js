@@ -18,7 +18,10 @@ async function call(ctx, store, opts) {
   const { path, context = null, method = "GET", timeoutMs = 10000, keyOverride } = opts;
   let url = store.base_url.replace(/\/+$/, "") + path;
   if (context && context.name && context.value != null && context.value !== "") {
-    url += (url.includes("?") ? "&" : "?") + encodeURIComponent(context.name) + "=" + encodeURIComponent(context.value);
+    const scoped = new URL(url);
+    // Pagination links cannot silently switch a location or add conflicting duplicate values.
+    scoped.searchParams.set(context.name, String(context.value));
+    url = scoped.toString();
   }
   await throttle(new URL(url).origin);
   let key = keyOverride;

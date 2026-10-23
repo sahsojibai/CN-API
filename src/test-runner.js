@@ -165,7 +165,7 @@ async function runTests(ctx, store, input = {}) {
   const pages = walk.pages;
   const repeated = walk.repeated || null;
   const pageError = walk.error || null;
-  const stoppedAtCap = !!walk.capped;
+  const stoppedAtCap = !!walk.capped || !!walk.timedOut;
   const dq = [];
   const all = pages.flat();
   const first = pages[0] || [];
@@ -235,7 +235,8 @@ async function runTests(ctx, store, input = {}) {
     : stoppedAtCap
       ? `Stopped at page ${MAX_PAGES} (test limit). Later pages were not read.`
       : `Page 1 to ${pages.length} read without gaps or repeats.`;
-  dq.push({ label: "All pages load", state: repeated || pageError || stoppedAtCap ? "warning" : pages.length ? "pass" : "failed", message: pageMsg });
+  if (store.delivery?.sample_location_id) dq.push({label:"Whole-store coverage",state:"warning",message:"These are automatic diagnostic samples. Complete coverage of every location is tracked by the background catalog import."});
+  dq.push({ label: "All pages load", state: repeated || pageError || stoppedAtCap ? "warning" : pages.length ? "pass" : "failed", message: pageMsg + (store.delivery?.sample_location_id ? " Diagnostic sample location only; not a complete store import." : "") });
 
   const p95 = percentile(timings, 0.95);
   dq.push(p95 != null && p95 <= P95_MS

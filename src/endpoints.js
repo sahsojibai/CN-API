@@ -89,7 +89,7 @@ const responded = (summary, res) => ({ state: "responded", summary, http: res.ht
 // last check used (see evalProducts).
 function defaultContext(store, context) {
   if (context) return context;
-  const value = store.delivery?.zone_value ?? store.delivery?.check_zone_value;
+  const value = store.delivery?.sample_location_id;
   const name = store.delivery?.context_param;
   return value != null && value !== "" && name ? { name, value: String(value) } : null;
 }
@@ -147,6 +147,7 @@ async function detectPaging(ctx, store, context, host, p1, list1, list2) {
   if (nextLinkOf(p1.link)) return { style: "link" };
   const c = cursorOf(p1.body);
   if (c) return { style: "cursor", param: "cursor", field: c.field };
+  if (Number(p1.body?.total_pages ?? p1.body?.last_page ?? p1.body?.meta?.last_page) === 1) return { style: "page", single_page: true };
   if (!list2.length || !sameFirst(list1, list2)) return { style: "page" };
   // Page number ignored: try an offset.
   const off = await judgedPath(ctx, store, { path: `/products?offset=${list1.length}`, context, label: "product list", host });
@@ -169,7 +170,7 @@ async function productPage(ctx, store, paging, n, state, context, host) {
     if (!state.nextUrl.startsWith(root)) {
       return { bad: { state: "error", message: "The next-page link points to another address. Stopped." } };
     }
-    return judgedPath(ctx, store, { path: state.nextUrl.slice(root.length), context, label: "product list", host, useContext: false });
+    return judgedPath(ctx, store, { path: state.nextUrl.slice(root.length), context, label: "product list", host, useContext: true });
   }
   return judgedPath(ctx, store, { path: fillPath(base, { page: n }), context, label: "product list", host });
 }
@@ -181,9 +182,11 @@ async function walkProducts(ctx, store, { context = null, host, maxPages = 40, d
   const list1 = M.extractList(p1.body) || [];
   if (!list1.length) return { pages: [], paging: { style: "none" } };
   const p2 = await getJudged(ctx, store, "products", { page: "2" }, context, host);
-  const list2 = p2.bad ? [] : M.extractList(p2.body) || [];
+  if (p2.bad) return { pages: [list1], error: { page: 2, message: p2.bad.message } };
+  const list2 = M.extractList(p2.body) || [];
   const paging = await detectPaging(ctx, store, context, host, p1, list1, list2);
   store.paging = paging;
+  if (paging.single_page) return { pages: [list1], paging };
   if (paging.style === "none") return { pages: [list1], paging, repeated: 2 };
   if (paging.style === "page" && !list2.length) return { pages: [list1], paging };
 
@@ -193,8 +196,9 @@ async function walkProducts(ctx, store, { context = null, host, maxPages = 40, d
   let error = null;
   let repeated = null;
   let capped = false;
+  let timedOut = false;
   for (let n = 2; n <= maxPages; n++) {
-    if (Date.now() > deadline) break;
+    if (Date.now() > deadline) { timedOut = true; break; }
     if (paging.style === "cursor" && !state.cursor) break;
     if (paging.style === "link" && !state.nextUrl) break;
     const r = paging.style === "page" && n === 2 ? p2 : await productPage(ctx, store, paging, n, state, context, host);
@@ -208,7 +212,7 @@ async function walkProducts(ctx, store, { context = null, host, maxPages = 40, d
     state.nextUrl = nextLinkOf(r.link);
     if (n === maxPages) capped = true;
   }
-  return { pages, paging, error, repeated, capped };
+  return { pages, paging, error, repeated, capped, timedOut };
 }
 
 // ---- Checks ----
@@ -230,8 +234,8 @@ function sampleWord(store) {
 
 async function evalProducts(ctx, store, values, context, host) {
   const p1 = await getJudged(ctx, store, "products", { ...values, page: "1" }, context, host);
-  if (p1.bad) return p1.bad;
-  let list = M.extractList(p1.body);
+  if (p1.bad && ![400,422].includes(p1.res.http)) return p1.bad;
+  let list = p1.bad ? [] : M.extractList(p1.body);
   if (!list) return needs(`No list found. Top-level keys: ${keysOf(p1.body)}.`, p1.res);
 
   // Zone-less stores return 200 with an empty list. Try the first zone so the check can say so.
@@ -239,11 +243,12 @@ async function evalProducts(ctx, store, values, context, host) {
     // The store's zone parameter is found by testing, not assumed. Find it now if it isn't known yet.
     if (!store.delivery?.context_param) {
       const { discoverZoneParam } = require("./location");
-      await discoverZoneParam(ctx, store, { host });
+      const discovery = await discoverZoneParam(ctx, store, { host });
+      if (discovery.retryable) return { ...needs(discovery.message, p1.res), retryable: true };
     }
     const z = await getJudged(ctx, store, "zones", {}, null, host);
     const zones = z.bad ? [] : M.extractList(z.body) || [];
-    const zoneId = zones.length ? M.zonesOf(store, zones)[0]?.id : null;
+    const zoneId = store.delivery?.sample_location_id ?? (zones.length ? M.zonesOf(store, zones)[0]?.id : null);
     if (zoneId != null && store.delivery?.context_param) {
       const withZone = await judgedPath(ctx, store, {
         path: fillPath(configOf(store, "products").path, { page: 1 }),
@@ -253,15 +258,12 @@ async function evalProducts(ctx, store, values, context, host) {
       });
       const zl = withZone.bad ? [] : M.extractList(withZone.body) || [];
       if (zl.length) {
-        store.delivery = { ...(store.delivery || {}), check_zone_value: String(zoneId) };
+        store.delivery = { ...(store.delivery || {}), sample_location_id: String(zoneId) };
         store.samples = { ...(store.samples || {}), product: zl.slice(0, 5) };
-        return needs(
-          `No products come back without a zone or outlet. This check used zone ${zoneId}. Pick a zone in Delivery setup and save it.`,
-          withZone.res
-        );
+        return responded(`Products discovered automatically across location-aware API. Mapping sample uses location ${zoneId}; full sync covers every location.`, withZone.res);
       }
     }
-    return needs("The first page has 0 products. Pick a zone or outlet in Delivery setup, then check again.", p1.res);
+    return needs("No product samples were found automatically. Check the product/location endpoints and parameter mapping; no customer location is required during setup.", p1.res);
   }
 
   if (!list.length) return needs("The first page has 0 products.", p1.res);
@@ -330,8 +332,11 @@ async function evalGeneric(ctx, store, key, values, context, host) {
   const g = await getJudged(ctx, store, key, values, context, host);
   if (g.bad) return g.bad;
   const list = M.extractList(g.body);
-  if (list) return responded(`200 · ${list.length} item${list.length === 1 ? "" : "s"}`, g.res);
-  if (M.isObj(g.body)) return responded("200 · object returned", g.res);
+  if (list) {
+    if (key === "zones") store.samples = { ...(store.samples || {}), zone: list.slice(0, 5) };
+    return { ...responded(`200 · ${list.length} item${list.length === 1 ? "" : "s"}`, g.res), records: list.slice(0, 50) };
+  }
+  if (M.isObj(g.body)) return { ...responded("200 · object returned", g.res), records: [g.body] };
   return needs("Responded, but the body is not a list or an object.", g.res);
 }
 

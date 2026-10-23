@@ -43,40 +43,40 @@ async function saveProductMapping(api, id, extras) {
   return api("PUT", `/api/stores/${id}/mapping`, { resource: "product", rows, extras });
 }
 
-test("zone-less store: the products check says a zone is needed and uses the first zone", async () => {
+test("zone-dependent store: automatic samples remove the customer-location setup barrier", async () => {
   const s = await startStack({ zoneRequired: true });
   try {
     const id = await s.create();
     let r = await s.api("POST", `/api/stores/${id}/endpoints/products/check`, {});
-    assert.equal(r.body.state, "needs_attention");
-    assert.match(r.body.message, /without a zone or outlet/);
-    assert.match(r.body.message, /zone 100/);
+    assert.equal(r.body.state, "responded");
+    assert.match(r.body.summary, /discovered automatically/);
+    assert.doesNotMatch(r.body.summary, /Pick a zone/);
 
-    // Choose the zone in Delivery setup: every product call now sends it.
+    // Legacy saved location choices are ignored; automatic sampling remains independent.
     r = await s.api("PUT", `/api/stores/${id}/delivery-settings`, { mode: "zone", zone: "100" });
-    assert.equal(r.body.zone_value, "100");
+    assert.equal(r.body.zone_value, null);
     r = await s.api("POST", `/api/stores/${id}/endpoints/products/check`, {});
     assert.equal(r.body.state, "responded");
     assert.equal(r.body.summary, "200 · 13 products per page");
 
     r = await s.api("GET", `/api/stores/${id}/zones`);
-    assert.equal(r.body.chosen, "100");
+    assert.equal(r.body.chosen, null);
   } finally { s.close(); }
 });
 
-test("zone-less store with no zones at all says to pick a zone", async () => {
+test("zone-dependent store automatically discovers samples after clearing a legacy location", async () => {
   const s = await startStack({ zoneRequired: true });
   try {
     const id = await s.create();
     await s.api("PUT", `/api/stores/${id}/delivery-settings`, { mode: "zone", zone: null });
     const r = await s.api("POST", `/api/stores/${id}/endpoints/products/check`, {});
-    assert.equal(r.body.state, "needs_attention");
-    assert.ok(r.body.message.length > 0);
+    assert.equal(r.body.state, "responded");
+    assert.match(r.body.summary, /discovered automatically/);
   } finally { s.close(); }
 });
 
 for (const style of ["link", "cursor", "offset"]) {
-  test(`paging: ${style} is detected and the test run reads all 30 pages`, async () => {
+  test(`paging: ${style} is detected and verification clearly labels its automatic sample`, async () => {
     const s = await startStack({ paging: style });
     try {
       const id = await s.create();
@@ -87,7 +87,7 @@ for (const style of ["link", "cursor", "offset"]) {
       const run = await s.api("POST", `/api/stores/${id}/test-runs`, {});
       const pages = run.body.data_quality.find((c) => c.label === "All pages load");
       assert.equal(pages.state, "pass", pages.message);
-      assert.match(pages.message, /Page 1 to 30 read/);
+      assert.match(pages.message, /Diagnostic sample location only/);
     } finally { s.close(); }
   });
 }
@@ -194,12 +194,12 @@ test("coalesce: a missing primary field falls back to its fallback path", () => 
   assert.equal(p2.price, "75.00");
 });
 
-test("zone-less store: the test run fails the catalog until a zone is chosen", async () => {
+test("zone-dependent store: verification samples automatically without choosing a customer location", async () => {
   const s = await startStack({ zoneRequired: true });
   try {
     const id = await s.create();
     const run = await s.api("POST", `/api/stores/${id}/test-runs`, {});
-    assert.equal(run.body.checks.find((c) => c.label === "Catalog").state, "failed");
-    assert.equal(run.body.can_continue, false);
+    assert.equal(run.body.checks.find((c) => c.label === "Catalog").state, "passed");
+    assert.ok(run.body.data_quality.find(c=>c.label==="Whole-store coverage"));
   } finally { s.close(); }
 });

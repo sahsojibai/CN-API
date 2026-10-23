@@ -10,7 +10,7 @@
     "start": "node src/server.js",
     "mock": "node src/mock-store.js",
     "mock:chattrn": "node src/mock-chattrn-store.js",
-    "test": "node --test test/guard.test.js test/backend.test.js test/gaps.test.js test/location.test.js test/catalog.test.js test/laravel-flow.test.js test/native-verification.test.js test/postgres.test.js test/admin-auth.test.js test/package-ready.test.js test/setup-resilience.test.js test/http-protection.test.js test/onboarding.test.js test/brands.test.js",
+    "test": "node --test test/guard.test.js test/backend.test.js test/gaps.test.js test/location.test.js test/catalog.test.js test/laravel-flow.test.js test/native-verification.test.js test/postgres.test.js test/admin-auth.test.js test/package-ready.test.js test/setup-resilience.test.js test/http-protection.test.js test/onboarding.test.js test/brands.test.js test/whole-store.test.js test/catalog-persistence.test.js",
     "test:postgres": "node --test test/postgres.test.js"
   },
   "dependencies": {

@@ -747,8 +747,8 @@ details summary { margin-top: 4px; }
             <button type="button" class="plain runAll" id="testAll">Test all endpoints</button>
           </div>
           <div class="row2" style="gap:12px">
-            <div class="field" style="flex:0 0 auto;min-width:200px"><label for="pages">Product pages to read</label><input type="number" id="pages" value="20" min="1" max="50"></div>
-            <div class="field" style="flex:1 1 300px"><span class="hint" style="padding-top:26px">Reads pages 1 to N of the product list, so the full count comes back.</span></div>
+            <div class="field" hidden><label for="pages">Diagnostic sample limit</label><input type="number" id="pages" value="20" min="1" max="50"></div>
+            <div class="field" style="flex:1 1 300px"><span class="hint" style="padding-top:26px">Setup reads representative samples automatically. Full pagination across all locations runs in the background.</span></div>
           </div>
           <div id="rows" style="display:flex;flex-direction:column"></div>
           <p class="hint">Create order, cancel order and cart price check are not tested here, because they change data in the store or need a signed-in customer.</p>
@@ -774,7 +774,7 @@ details summary { margin-top: 4px; }
           </div>
           <div class="row2">
             <div class="field" style="flex:1 1 100%"><label for="askText">Your question</label><input type="text" id="askText" placeholder="e.g. Is 256GB black available in Zone 3? What is the price?" autocomplete="off"></div>
-            <div class="field" style="flex:1 1 220px"><label for="askZone">Zone or outlet value (optional)</label><input type="text" id="askZone" placeholder="Empty: use the zone in the question, or Delivery setup" autocomplete="off"></div>
+            <div class="field" style="flex:1 1 220px"><label for="askZone">Zone or outlet value (optional)</label><input type="text" id="askZone" placeholder="Customer area or outlet name/ID; leave blank to be asked" autocomplete="off"></div>
             <div class="field" style="flex:0 0 auto;justify-content:flex-end"><button type="button" class="primary" id="askBtn">Ask</button></div>
           </div>
           <div id="askAnswer" class="result"></div>
@@ -812,7 +812,7 @@ details summary { margin-top: 4px; }
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button type="button" class="plain" id="loadZones" style="color:var(--brand)">View all zones</button>
             <button type="button" class="plain" id="findParam" style="color:var(--brand)">Find zone parameter</button>
-            <button type="button" class="plain" id="syncAll" style="color:var(--brand)">Sync all zones</button>
+            <button type="button" class="plain" id="syncAll" style="color:var(--brand)">Import all locations</button>
             <span class="hint" id="zoneStatus"></span>
           </div>
         </div>
@@ -822,7 +822,7 @@ details summary { margin-top: 4px; }
             <summary>Tester settings (not in the design)</summary>
             <div class="row2" style="margin-top:12px">
               <div class="field"><label for="ctxName">Send as query parameter</label><input type="text" id="ctxName" placeholder="Found by Find zone parameter" autocomplete="off"><span class="hint" id="ctxHint"></span></div>
-              <div class="field"><label for="ctxValue">Area or outlet value</label><input type="text" id="ctxValue" placeholder="Pick a zone below, or type an ID" autocomplete="off"></div>
+              <div class="field" hidden><label for="ctxValue">Automatic diagnostic sample (not a customer default)</label><input type="text" id="ctxValue" placeholder="Diagnostic only; never a store-wide default" autocomplete="off"></div>
             </div>
           </details>
         </div>
@@ -1052,29 +1052,19 @@ details summary { margin-top: 4px; }
   }
 
   async function callRow(r, row, pageOverride) {
-    var built = buildUrl(r, row, pageOverride);
-    if (built.error) return { status: "skip", message: built.error };
-    var res = await get(built.url);
-    var out = { status: "pass", url: built.url, ms: res.ms, http: res.http, raw: res.text || "", records: null, listKey: null, message: "" };
-    if (!res.ok) { out.status = "fail"; out.message = res.error; out.http = null; return out; }
-    if (res.http === 401 || res.http === 403) { out.status = "warn"; out.message = "HTTP " + res.http + ": the store needs sign-in or a key for this endpoint, and it was not accepted."; return out; }
-    if (res.http === 404) { out.status = "fail"; out.message = "HTTP 404: this endpoint doesn't exist on the store. Check the path."; return out; }
-    if (res.http >= 500) { out.status = "fail"; out.message = "HTTP " + res.http + ": the store had a server error."; return out; }
-    if (res.http !== 200) { out.status = "fail"; out.message = "HTTP " + res.http + ": expected 200."; return out; }
-    if (!res.isJson) { out.status = "fail"; out.message = "HTTP 200, but the body is not JSON. The path probably points at a web page."; return out; }
-    if (r.kind === "list") {
-      var found = extractList(res.body);
-      if (!found) { out.status = "warn"; out.message = "Responded, but no list was found. Top-level keys: " + (isObj(res.body) ? Object.keys(res.body).join(", ") : "none") + "."; return out; }
-      out.records = found.list; out.listKey = found.key;
-      out.message = found.list.length + " record(s) in \"" + found.key + "\".";
-      if (found.list.length === 0) { out.status = "warn"; out.message = "Responded with an empty list (\"" + found.key + "\")."; }
-    } else {
-      var one = extractOne(res.body);
-      out.records = one ? [one] : [];
-      out.message = one ? "One record returned." : "Responded, but the body is not an object.";
-      if (!one) out.status = "warn";
-    }
-    return out;
+    try {
+      var id = await ensureBackendStore();
+      var path = row.querySelector("[data-path]").value.trim();
+      var saved = await backend("PUT", "/api/stores/" + id + "/endpoints/" + r.id, {path:path});
+      if (saved.http !== 200) throw new Error(saved.body.error?.message || "Check endpoint path.");
+      var input = {};
+      row.querySelectorAll("[data-param]").forEach(function(el) { if (el.value.trim()) input[el.getAttribute("data-param")] = el.value.trim(); });
+      var response = await backend("POST", "/api/stores/" + id + "/endpoints/" + r.id + "/check", input);
+      if (response.http !== 200) throw new Error(response.body.error?.message || "Endpoint check failed.");
+      var body = response.body;
+      return {status:body.state === "responded" ? "pass" : body.state === "error" ? "fail" : "warn",
+        message:body.summary || body.message, records:body.records || null, listKey:r.id, http:body.http, ms:body.ms};
+    } catch(error) { return {status:"fail",message:error.message}; }
   }
 
   function renderRow(r, res) {
@@ -1126,41 +1116,15 @@ details summary { margin-top: 4px; }
   }
 
   async function readAllProductPages() {
-    var r = ROWS[0];
-    var row = rowEl(r);
-    var max = Math.max(1, Math.min(50, parseInt($("pages").value, 10) || 1));
-    var all = [];
-    var first = null;
-    var lastKey = null;
-    var lastRes = null;
-    var p;
-    for (p = 1; p <= max; p++) {
-      setProgress("Reading product page " + p + " of up to " + max + "…");
-      var res = await callRow(r, row, p);
-      lastRes = res;
-      if (p === 1) first = res;
-      if (res.status === "skip" || res.status === "fail" || !res.records) break;
-      lastKey = res.listKey;
-      if (res.records.length === 0) break;
-      all = all.concat(res.records);
-    }
-    state.pageCount = p - 1;
-    setProgress("");
-    if (!first || !first.records) return first || lastRes;
-    var out = Object.assign({}, first);
-    out.records = all;
-    out.listKey = lastKey || first.listKey;
-    out.message = all.length + " product(s) across " + state.pageCount + " page(s) in \"" + out.listKey + "\".";
-    if (all.length === 0) {
-      out.status = "warn";
-      out.message = state.ctxValue
-        ? "Responded, but no products came back for " + state.ctxName + "=" + state.ctxValue + ". Try another zone or outlet, or open Show response."
-        : "No products came back, and no zone or outlet was sent. Pick a zone or outlet in Delivery setup, then test again.";
-    } else {
-      out.status = "pass";
-    }
-    if (all.length === 0 && first.records && first.records.length === 0) out.raw = first.raw;
-    return out;
+    try {
+      setProgress("Discovering product samples automatically. No customer location is required…");
+      await prepareMappedConnection();
+      var result = {status:"pass", records:state.products, listKey:"automatic samples", http:200,
+        message:state.products.length + " mapping samples discovered automatically. The full catalog covers all locations and imports in the background after activation."};
+      state.pageCount = 1;
+      return result;
+    } catch (error) { return {status:"fail", records:[], message:error.message}; }
+    finally { setProgress(""); }
   }
 
   function setProgress(t) { $("productSummary").textContent = t; }
@@ -1169,43 +1133,12 @@ details summary { margin-top: 4px; }
     document.querySelectorAll(".runAll").forEach(function (b) { b.disabled = on; });
   }
 
-  // The catalog covers every zone, so the product sample only needs one zone to read from.
-  // If none is chosen, the first zone from the store's list is used for the sample.
-  async function ensureSampleZone() {
-    if (state.ctxValue || !state.ctxName) return;
-    var base = $("base").value.trim().replace(/\/+$/, "");
-    var res = await get(base + "/delivery-zone");
-    if (!res.ok || res.http !== 200 || !res.isJson) return;
-    var found = extractList(res.body);
-    if (!found || !found.list.length) return;
-    var z = found.list.filter(isObj)[0];
-    var zid = pick(z, "zone", "zid");
-    var id = zid != null && zid !== "" ? zid : (z.id != null ? z.id : z.code);
-    if (id == null) return;
-    state.ctxValue = String(id);
-    $("ctxValue").value = state.ctxValue;
-    $("zoneStatus").textContent = "Sample read from zone " + state.ctxValue + ". The catalog sync covers every zone.";
-  }
-
+  // Endpoint diagnostics discover representative samples automatically; full import is a separate job.
   async function testAll() {
     setRunning(true);
-    // The zone parameter name comes from discovery for this store; it isn't assumed.
-    if (!state.ctxName) await findZoneParam();
-    await ensureSampleZone();
     state.rowResults = {};
-    state.products = [];
-    for (var i = 0; i < ROWS.length; i++) {
-      var r = ROWS[i];
-      if (r.id === "detail" && !state.products.length) {
-        var skip = { status: "skip", message: "Skipped: no product to look up. Product list must return products first." };
-        state.rowResults.detail = skip;
-        renderRow(r, skip);
-        rowEl(r).querySelector("[data-chip]").innerHTML = chip("skip");
-        continue;
-      }
-      await runOne(r);
-    }
-    setRunning(false);
+    try { for (var r of ROWS) await runOne(r); }
+    finally { setRunning(false); }
   }
 
   var TONE = { pass: ["✓", "Passed"], warn: ["!", "Needs attention"], fail: ["✕", "Failed"], skip: ["–", "Not tested"] };
@@ -1341,7 +1274,7 @@ details summary { margin-top: 4px; }
     var records = state.products;
     if (!records.length) { $("productData").hidden = true; return; }
     $("productData").hidden = false;
-    $("productSummary").textContent = records.length + " product(s) read across " + (state.pageCount || 1) + " page(s).";
+    $("productSummary").textContent = records.length + " mapping sample(s), not the full catalog. Whole-store coverage is shown above.";
     var map = fieldMap(records);
     var need = CHECKS.map(function (c) {
       // Use the field picked in Map fields, so this table agrees with the test results.
@@ -1524,41 +1457,23 @@ details summary { margin-top: 4px; }
   }
 
   async function askOpen() {
-    var q = $("askText").value.trim();
-    if (!q) { askBox("<div>Type a question first.</div>"); return; }
-    if (!state.products.length) {
-      askBox('<div>No products are loaded yet. Press "Run all tests" first, so the tester has the product list.</div>');
-      return;
-    }
-    var zone = resolveZone($("askZone").value.trim() || zoneFromQuestion(q) || state.ctxValue);
-    var zName = $("ctxName").value.trim();
-    var words = questionWords(q);
-    var scored = state.products.map(function (p) {
-      var h = haystack(p);
-      var s = words.filter(function (w) { return h.indexOf(w) >= 0; }).length;
-      return { p: p, s: s };
-    });
-    var cands = words.length
-      ? scored.filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; })
-      : scored;
-    if (!cands.length) {
-      askBox("<div>No loaded product matches the words in your question (" + esc(words.join(", ")) + "). The list has " + state.products.length + " products. Try a different word, like the brand or the type of product.</div>");
-      return;
-    }
-    var shown = cands.slice(0, 12).map(function (x) { return x.p; });
-    var scope = zone ? "for " + zName + " = " + zone : "with no zone sent, so results are store-wide";
-    askBox('<div class="hint" id="askProgress">Checking ' + shown.length + " of " + cands.length + " matching product(s) " + esc(scope) + "…</div>" +
-      '<div id="askCards" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>');
-    var counts = { avail: 0, out: 0, unknown: 0, nozone: 0, error: 0 };
-    for (var i = 0; i < shown.length; i++) {
-      var r = await checkOne(shown[i], zone, zName);
-      counts[r.status]++;
-      $("askCards").insertAdjacentHTML("beforeend", r.html);
-    }
-    var head = shown.length + " of " + cands.length + " matching product(s) checked " + scope + ". " +
-      counts.avail + " available, " + counts.out + " out of stock, " + counts.nozone + " not in this zone, " +
-      counts.unknown + " with no stock figure, " + counts.error + " with an error.";
-    $("askProgress").outerHTML = '<div style="font-weight:600">' + esc(head) + "</div>";
+    var query = $("askText").value.trim();
+    if (!query) { askBox("<p>Type a product question first.</p>"); return; }
+    try {
+      var id = await ensureBackendStore();
+      var result = await backend("POST", "/api/stores/" + id + "/product-lookup", {
+        query:query, area:$("askZone").value.trim() || null,
+      });
+      if (result.http !== 200) throw new Error(result.body.error?.message || "Product lookup failed.");
+      var body = result.body;
+      askBox((body.question ? '<p><strong>' + esc(body.question) + '</strong></p>' : '') +
+        (body.message ? '<p class="hint">' + esc(body.message) + '</p>' : '') +
+        (body.products || []).map(function(p) {
+          return '<article class="card"><strong>' + esc(p.title) + '</strong><p>' + esc(p.description || '') + '</p>' +
+            (body.location_required ? '<p>Choose the customer’s location to check live price and stock.</p>' :
+            '<p>Price: ' + esc(p.price ?? "not confirmed") + ' · Stock: ' + esc(p.stock ?? "not confirmed") + '</p>') + '</article>';
+        }).join(''));
+    } catch(error) { askBox('<p>' + esc(error.message) + '</p>'); }
   }
 
   // ---- Map the API fields -------------------------------------------------
@@ -1566,6 +1481,7 @@ details summary { margin-top: 4px; }
     product: [
       { key: "id", label: "Product ID", chattrn: "product.id", level: "required", syn: ["id", "productid", "product_id"] },
       { key: "title", label: "Title", chattrn: "product.title", level: "required", syn: ["title", "name", "productname"] },
+      { key: "description", label: "Description", chattrn: "product.description", level: "optional", syn: ["description", "bodyhtml", "details", "shortdescription"] },
       { key: "price", label: "Selling price", chattrn: "product.price", level: "required", money: true,
         syn: ["sellprice", "sellingprice", "saleprice", "discountprice", "price", "currentprice"], fallbackSyn: ["price", "regularprice"] },
       { key: "compare", label: "Was price", chattrn: "product.compare_at_price", level: "optional", money: true,
@@ -1943,15 +1859,23 @@ details summary { margin-top: 4px; }
   }
   async function prepareMappedConnection() {
     var id = await ensureBackendStore();
-    for (var row of ROWS.filter(function(r) { return ["products","detail","search","zones"].includes(r.id); })) {
+    for (var row of ROWS.filter(function(r) { return ["products","detail","search","orders","order","categories","zones","payments","brand"].includes(r.id); })) {
       var response = await backend("PUT", "/api/stores/" + id + "/endpoints/" + row.id, { path: row.path });
       if (response.http !== 200) throw new Error(response.body.error?.message || "Check the endpoint paths.");
     }
-    var check = await backend("POST", "/api/stores/" + id + "/endpoints/products/check", { zone: state.ctxValue || null });
+    var check;
+    for (var attempt = 0; attempt < 50; attempt++) {
+      if (state.storeId !== id) throw new Error("Connection settings changed. Start discovery again.");
+      check = await backend("POST", "/api/stores/" + id + "/endpoints/products/check", {});
+      if (!check.body.retryable) break;
+      $("finishNote").textContent = check.body.message;
+      setProgress(check.body.message);
+    }
     if (check.http !== 200 || check.body.state !== "responded") throw new Error(check.body.summary || check.body.message || "The product endpoint must respond before reviewing.");
     var saved = await backend("GET", "/api/stores/" + id);
     state.products = saved.body.samples?.product || [];
     if (!state.products.length) throw new Error("The product endpoint returned no samples. Check its path and delivery context.");
+    $("finishNote").textContent = "";
     return id;
   }
   async function saveMappedReview() {
@@ -1976,10 +1900,12 @@ details summary { margin-top: 4px; }
     state.progress.verified = false; $("next").disabled = true;
     $("testPanel").innerHTML = '<p class="hint">Verifying the saved mapping through Chattrn…</p>';
     try {
-      var res = await backend("POST", "/api/stores/" + await ensureBackendStore() + "/test-runs", {zone:state.ctxValue || null});
+      var res = await backend("POST", "/api/stores/" + await ensureBackendStore() + "/test-runs", {});
       if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
       state.progress.verified = res.body.can_continue === true;
-      $("testPanel").innerHTML = '<div class="card">' + res.body.checks.map(checkRowHtml).join("") + '<button type="button" id="runAgain">Run verification again</button></div>';
+      $("testPanel").innerHTML = '<div class="card"><p class="hint">Verification uses automatic samples. Whole-store import includes every location and continues in the background.</p>' + res.body.checks.map(checkRowHtml).join("") +
+        (res.body.data_quality || []).map(checkRowHtml).join("") + '<p id="mappedCatalogProgress" class="hint"></p><button type="button" id="runAgain">Run verification again</button></div>';
+      if (state.progress.verified) watchCatalog(state.storeId, "mappedCatalogProgress");
       ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
     } catch(e) { $("testPanel").textContent = e.message; }
     finally { $("next").disabled = !state.progress.verified; }
@@ -2002,6 +1928,7 @@ details summary { margin-top: 4px; }
       renderMap();
     }
     if (state.step === 3) runMappedVerification();
+    if (state.step === 4 && state.storeId) watchCatalog(state.storeId, "zoneStatus");
   }
 
   function setMode(m) {
@@ -2038,7 +1965,7 @@ details summary { margin-top: 4px; }
         '<td class="mono">' + esc(fee != null ? fee : "not sent") + "</td>" +
         '<td class="mono">' + esc(min != null ? min : "not sent") + "</td>" +
         '<td class="mono">' + esc(z.products_count != null ? z.products_count : "not sent") + "</td>" +
-        '<td><button type="button" class="plain use-zone" data-zid="' + esc(String(id)) + '">Use</button></td></tr>';
+        '<td>Customer chooses in chat</td></tr>';
     }).join("");
   }
 
@@ -2138,25 +2065,30 @@ details summary { margin-top: 4px; }
   // Reads every zone (or outlet) through the backend and tags each product with the zones it appears in.
   // Customers are then answered from their own zone's products.
   $("syncAll").addEventListener("click", async function () {
-    var btn = this;
-    btn.disabled = true;
-    $("zoneStatus").textContent = "Syncing every zone. This can take a minute…";
     try {
       var id = await ensureBackendStore();
-      var res = await backend("POST", "/api/stores/" + id + "/catalog/sync", {});
-      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
-      if (!res.body.ok) {
-        $("zoneStatus").textContent = res.body.message;
-      } else {
-        $("zoneStatus").textContent = "Synced " + res.body.products_total + " products from " + res.body.zones_checked +
-          " zones. Each product is tagged with the zones it appears in.";
-      }
-    } catch (e) {
-      $("zoneStatus").textContent = "Could not sync: " + e.message;
-    } finally {
-      btn.disabled = false;
-    }
+      var response = await backend("POST", "/api/stores/" + id + "/catalog/sync", {retry:true});
+      if (response.http !== 202) throw new Error(response.body.error?.message || "Could not start import.");
+      watchCatalog(id, "zoneStatus");
+    } catch(error) { $("zoneStatus").textContent = error.message; }
   });
+
+  var catalogWatchTimers = {};
+  function watchCatalog(id, target) {
+    clearTimeout(catalogWatchTimers[target]);
+    async function poll() {
+      try {
+        var response = await backend("GET", "/api/stores/" + id + "/catalog/status");
+        if (response.http !== 200) throw new Error(response.body.error?.message || "Could not read catalog progress.");
+        var job = response.body;
+        $(target).textContent = 'Whole-store import: ' + job.status + ' · ' + job.products_total + ' products · ' +
+          job.locations_done + ' of ' + (job.locations_total ?? '?') + ' locations complete.' + (job.error ? ' ' + job.error : '');
+        if (["queued","running"].includes(job.status) && !$(target).closest('[hidden]')) catalogWatchTimers[target] = setTimeout(poll, 2000);
+      } catch(error) { $(target).textContent = error.message; }
+    }
+    poll();
+  }
+
   $("findParam").addEventListener("click", async function () {
     var btn = this;
     btn.disabled = true;
@@ -2285,7 +2217,7 @@ details summary { margin-top: 4px; }
         '<td><span class="store-name"><span class="store-logo">' + GLOBE + '</span><button type="button" class="store-link" data-open="' + esc(s.id) + '">' + esc(s.name) + '</button></span></td>' +
         '<td>' + esc(String(s.website_url || "—").replace(/^https?:\/\//, "").replace(/\/$/, "")) + '</td>' +
         '<td>' + esc(s.brand || "—") + '</td>' +
-        '<td><span class="badge b-pass">Connected</span></td>' +
+        '<td><span class="badge b-pass">Connected</span><div class="hint">Catalog: ' + esc(s.catalog_sync?.status || 'not started') + '</div></td>' +
         '<td class="act"><button type="button" class="icon-btn" aria-label="Store actions for ' + esc(s.name) + '" aria-expanded="false" data-store="' + esc(s.id) + '">' + DOTS + '</button></td>' +
         '</tr>';
     }).join("");
@@ -2364,7 +2296,7 @@ details summary { margin-top: 4px; }
       $("finishNote").textContent = "";
       await clearSetupDraft("mapped_api", id);
       showList();
-      setBanner(($("storeName").value.trim() || "Store") + " is connected.");
+      setBanner(($("storeName").value.trim() || "Store") + " is connected. Whole-store catalog progress is available in store details.");
     } catch (e) {
       $("finishNote").style.color = "var(--fail)";
       $("finishNote").textContent = "Not connected yet: " + e.message;
@@ -2395,6 +2327,8 @@ details summary { margin-top: 4px; }
       return;
     }
     renderDetail(res.body);
+    if (!$("detailCatalogProgress")) $("detailBody").insertAdjacentHTML("beforeend", '<div class="card"><h3>Whole-store catalog</h3><p id="detailCatalogProgress" class="hint"></p><button type="button" id="retryCatalogImport">Import all locations / retry</button></div>');
+    watchCatalog(id, "detailCatalogProgress");
   }
   function renderDetail(s) {
     detailStore = s;
@@ -2411,7 +2345,7 @@ details summary { margin-top: 4px; }
         ? '<span class="badge b-skip">Disconnected</span>'
         : '<span class="badge b-warn">Not connected</span>';
     var synced = s.catalog && s.catalog.synced_at ? new Date(s.catalog.synced_at).toLocaleString() : "Never";
-    var products = s.catalog && Array.isArray(s.catalog.products) ? String(s.catalog.products.length) : "—";
+    var products = s.catalog ? String(s.catalog.products_total ?? s.catalog.products?.length ?? 0) : "—";
     var zones = s.catalog && s.catalog.zones_checked ? String(s.catalog.zones_checked) : "—";
     $("detailBody").innerHTML =
       '<div class="card"><h3 class="card-title">Store</h3>' +
@@ -2428,12 +2362,14 @@ details summary { margin-top: 4px; }
         '<p class="hint" id="detailNote"></p>' +
       '</div>' +
       '<div class="card"><h3 class="card-title">Sync health</h3>' +
-        kv("Product sync", "Not scheduled yet") +
+        kv("Product sync", s.catalog_sync?.next_sync_at ? "Automatic hourly refresh while service is running" : "Preparing whole-store import") +
         kv("Last sync", esc(synced)) +
         kv("Products in catalog", products) +
+        kv("Location coverage", (s.catalog_sync?.locations_done || 0) + " / " + (s.catalog_sync?.plan?.locations?.length ?? "discovering")) +
+        '<p id="detailCatalogProgress" class="hint"></p><button type="button" id="retryCatalogImport">Import all locations / retry</button>' +
         kv("Zones checked", zones) +
-        kv("Full catalog check", "Not scheduled yet") +
-        kv("Failed syncs", "Not tracked yet") +
+        kv("Full catalog check", s.catalog_sync?.status || "Not started") +
+        kv("Import issue", s.catalog_sync?.error || "None reported") +
       '</div>';
   }
 
@@ -2557,8 +2493,31 @@ details summary { margin-top: 4px; }
     $("auth").dispatchEvent(new Event("change"));
     setMode($("storeType").value);
     state.storeId = s.id;
+    state.products = s.samples?.product || [];
+    state.map = {product:{},variant:{},zone:{},order:{},customer:{}};
+    state.suggested = {product:false,variant:false,zone:false};
+    var aliases = {product:{images:"image",compare_at_price:"compare",updated_at:"updated",product_type:"type"},
+      variant:{id:"vid",title:"vtitle",price:"vprice",compare_at_price:"vcompare",stock:"vstock",sku:"vsku",inventory_item_id:"vinv"}};
+    $("noUpdatedAt").checked = false;
+    Object.entries(s.mapping || {}).forEach(function(entry) {
+      var resource = entry[0], mapping = entry[1];
+      var version = mapping.versions?.find(function(v){return v.version === mapping.current;});
+      if (!version || !state.map[resource]) return;
+      version.rows.forEach(function(row) {
+        var key = aliases[resource]?.[row.key] || row.key;
+        state.map[resource][key] = {primary:row.source_path || "",fallback:row.fallback_path || ""};
+        if (resource === "product" && row.key === "updated_at") $("noUpdatedAt").checked = row.not_in_store === true;
+      });
+      state.suggested[resource] = true;
+    });
   }
   $("detailBody").addEventListener("click", async function (e) {
+    if (e.target.id === "retryCatalogImport" && detailStore) {
+      var started = await backend("POST", "/api/stores/" + detailStore.id + "/catalog/sync", {retry:true});
+      if (started.http !== 202) { $("detailCatalogProgress").textContent = started.body.error?.message || "Could not start import."; return; }
+      watchCatalog(detailStore.id, "detailCatalogProgress");
+      return;
+    }
     var b = e.target.closest ? e.target.closest("[data-act]") : null;
     if (!b || !detailStore) return;
     var act = b.getAttribute("data-act");
@@ -2758,7 +2717,8 @@ details summary { margin-top: 4px; }
         run.checks.map(checkRowHtml).join("") + '</div></div>';
       var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
         (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
-      $("cTestPanel").innerHTML = checksHtml + dqHtml;
+      $("cTestPanel").innerHTML = checksHtml + dqHtml + '<p id="nativeCatalogProgress" class="hint"></p>';
+      if (run.can_continue) watchCatalog(id, "nativeCatalogProgress");
       $("cNext").disabled = !run.can_continue;
       if (!run.can_continue) $("cCheckMsg").textContent = "Required connection checks must pass before continuing.";
     } catch (e) {
@@ -3343,7 +3303,8 @@ details summary { margin-top: 4px; }
         '<p class="hint" style="margin-top:4px">Check these look right — this is how the AI Agent and the inbox will see your products.</p></div>' +
         (previewError ? '<p class="hint" style="color:var(--fail)">' + esc(previewError) + "</p>" : lSampleTableHtml(products, fields)) + "</div>";
 
-      $("lVerifyPanel").innerHTML = banner + testCard + dqCard + sampleCard;
+      $("lVerifyPanel").innerHTML = banner + testCard + dqCard + sampleCard + '<p id="packageCatalogProgress" class="hint"></p>';
+      if (verificationPassed) watchCatalog(lState.storeId, "packageCatalogProgress");
       var rerun = $("lRerun");
       if (rerun) rerun.addEventListener("click", runLaravelVerify);
       $("lNext").disabled = !verificationPassed;

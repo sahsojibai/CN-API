@@ -103,3 +103,37 @@ test("the test connection runs discovery and reports it as a check", async () =>
     assert.equal(check.blocking, false);
   } finally { s.close(); }
 });
+
+test("automatic discovery keeps scanning when the first several outlets are empty",async t=>{
+  const E=require('../src/endpoints');
+  t.mock.method(E,'getJudged',async()=>({body:{zones:Array.from({length:12},(_,id)=>({id:id+1,name:'Outlet '+id}))}}));
+  t.mock.method(E,'judgedPath',async(_ctx,_store,opts)=>({res:{http:200},body:{products:opts.context?.name==='outletId' && opts.context.value==='12' ? [{id:1,title:'Rice'}] : []}}));
+  const {discoverZoneParam}=require('../src/location');
+  const store={base_url:'https://store.test',delivery:{},endpoints:{products:{path:'/products?page=:page'}}};
+  const result=await discoverZoneParam({},store);
+  assert.equal(result.state,'passed');assert.equal(store.delivery.context_param,'outletId');
+  assert.equal(store.delivery.sample_location_id,'12');assert.equal(store.delivery.zone_value,undefined);
+});
+
+test("bounded discovery resumes its saved cursor instead of restarting or asking for a location",async t=>{
+  const E=require('../src/endpoints');
+  let now=Date.now();
+  t.mock.method(Date,'now',()=>now);
+  t.mock.method(E,'getJudged',async()=>({body:{zones:[{id:'east',name:'East'}]}}));
+  const visited=[];
+  t.mock.method(E,'judgedPath',async(_ctx,_store,opts)=>{
+    if(opts.context){visited.push(opts.context.name);now+=21000;}
+    return {res:{http:200},body:{products:opts.context?.name==='zoneId'?[{id:1,title:'Rice'}]:[]}};
+  });
+  const {discoverZoneParam}=require('../src/location');
+  let store={base_url:'https://store.test',delivery:{},endpoints:{products:{path:'/products?page=:page'}}};
+  let result;
+  for(let i=0;i<20;i++){
+    result=await discoverZoneParam({},store);
+    if(result.state==='passed')break;
+    assert.equal(result.retryable,true);
+    store=structuredClone(store);
+  }
+  assert.equal(result.state,'passed');assert.equal(new Set(visited).size,visited.length);
+  assert.equal(store.delivery.context_param,'zoneId');assert.equal(store.delivery.zone_value,undefined);
+});

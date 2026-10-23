@@ -13,7 +13,9 @@ const E = require("./endpoints");
 const M = require("./mapping");
 const { runTests } = require("./test-runner");
 const { discoverZoneParam } = require("./location");
-const { syncCatalog, catalogFor } = require("./catalog");
+const { catalogFor, beginSync, syncStatus, neutralProduct } = require("./catalog");
+const { createCatalogJobs } = require("./catalog-jobs");
+const { lookupProducts } = require("./product-lookup");
 const CC = require("./chattrn-connector");
 const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
@@ -42,6 +44,7 @@ const CHATTRN_LIKE = ["chattrn_api", "laravel_package"]; // both read through th
 function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   const db = database || new Db(path.join(dataDir, "stores.json"));
   const ctx = { db, secretKey: secretKey || loadSecretKey(dataDir) };
+  const catalogJobs = createCatalogJobs(ctx);
   const auth = require("./admin-auth").createAdminAuth(adminToken, !!process.env.RENDER || process.env.NODE_ENV === "production");
   let loginFailures = 0;
   let loginWindow = Date.now();
@@ -233,7 +236,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("POST", "/api/stores/:id/disconnect", async ({ params }) => {
     const s = await findStore(params.id);
     s.status = "disconnected";
-    await db.put(s);
+    if (s.catalog_sync && ["queued", "running"].includes(s.catalog_sync.status)) s.catalog_sync.status = "paused";
+    await db.put(s, {catalog:true});
     return { body: publicView(s) };
   });
 
@@ -585,7 +589,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     const ask = body.ask_area_when || s.delivery.ask_area_when;
     if (!ASK_WHEN.includes(ask)) throw new HttpError(422, "ask_area_when", `ask_area_when must be ${ASK_WHEN.join(", ")}.`);
     // zone: the zone or outlet id every product call is sent with. Empty clears it.
-    const zone_value = body.zone === undefined ? s.delivery.zone_value ?? null : body.zone === null || body.zone === "" ? null : String(body.zone);
+    const zone_value = null; // A store connection never selects a customer's location.
     // A parameter name the probe confirmed for this store is kept while the mode stays the same.
     const prev = s.delivery || {};
     const keep = prev.param_confirmed && prev.mode === mode;
@@ -594,6 +598,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       context_param: keep ? prev.context_param : null,
       param_confirmed: !!keep,
       location_probe: keep ? prev.location_probe : undefined,
+      sample_location_id: keep ? prev.sample_location_id : undefined,
       zone_value,
       ask_area_when: ask,
       remember_area: body.remember_area === undefined ? s.delivery.remember_area : !!body.remember_area,
@@ -604,21 +609,27 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
 
   // ---- test runs and products ----
 
-  route("POST", "/api/stores/:id/catalog/sync", async ({ params }) => {
+  route("POST", "/api/stores/:id/catalog/sync", async ({ params, body }) => {
     const s = await findStore(params.id);
-    const result = await syncCatalog(ctx, s, { deadline: Date.now() + 55000 });
-    if (result.ok) await db.put(s);
-    return { body: result };
+    try { await beginSync(ctx, s, { retry: !!body.retry, refresh: true }); }
+    catch (error) { throw new HttpError(422, "catalog_setup", error.message); }
+    await db.put(s, {catalog:true}); catalogJobs.wake();
+    return { status: 202, body: syncStatus(s) };
   });
 
-  // Products a customer in one zone can be offered (from the last sync). Without ?zone, every synced product.
+  route("GET", "/api/stores/:id/catalog/status", async ({ params }) => ({ body: syncStatus(await findStore(params.id)) }));
+
   route("GET", "/api/stores/:id/catalog", async ({ params, query }) => {
     const s = await findStore(params.id);
-    if (!s.catalog) throw new HttpError(409, "not_synced", "Sync the catalog first: POST /api/stores/:id/catalog/sync.");
-    const zone = query.zone != null && query.zone !== "" ? String(query.zone) : null;
+    const products = catalogFor(s, query.zone);
+    if (!products) throw new HttpError(409, "not_synced", "Start the whole-store catalog sync first.");
+    const text = String(query.query || "").toLowerCase();
+    const items = text ? products.filter(p => [p.title, p.vendor, p.description].some(v => String(v || "").toLowerCase().includes(text))) : products;
     const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
-    const items = catalogFor(s, zone);
-    return { body: { zone, count: items.length, synced_at: s.catalog.synced_at, products: items.slice(0, limit) } };
+    const offset = Math.max(0, Number(query.offset) || 0);
+    return { body: { zone: query.zone || null, count: items.length, products: items.slice(offset, offset + limit),
+      next_offset: offset + limit < items.length ? offset + limit : null, sync: syncStatus(s),
+      complete: !!s.catalog?.complete && !s.catalog_build, location_required: !!(s.catalog_build || s.catalog)?.location_required } };
   });
 
   route("POST", "/api/stores/:id/location/discover", async ({ params }) => {
@@ -648,7 +659,9 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     if (problem) throw new HttpError(409, "verification_required", problem);
     s.status = "connected";
     s.onboarding.activated_at = new Date().toISOString();
-    await db.put(s);
+    if (s.base_url || s.chattrn?.base_url) await beginSync(ctx, s);
+    await db.put(s, {catalog:true});
+    catalogJobs.wake();
     return { body: { state: "connected", store: publicView(s) } };
   });
 
@@ -658,7 +671,11 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       ? await runChattrnTests(ctx, s, {})
       : await runTests(ctx, s, { phone: body.phone || null, zone: body.zone ?? null, rediscover: !!body.rediscover });
     run.configuration_stamp = configurationStamp(s);
-    await db.put(s);
+    if (run.can_continue && s.onboarding?.review_stamp === run.configuration_stamp) {
+      await beginSync(ctx, s);
+      await db.put(s, {catalog:true});
+      catalogJobs.wake();
+    } else await db.put(s);
     return { body: run };
   });
 
@@ -681,26 +698,31 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     return { body: { count: list.length, orders: list.map((raw) => M.toOrder(s, raw)) } };
   });
 
+  route("POST", "/api/stores/:id/product-lookup", async ({ params, body }) => {
+    const s = await findStore(params.id);
+    return { body: await lookupProducts(ctx, s, body) };
+  });
+
   route("GET", "/api/stores/:id/products", async ({ params, query }) => {
     const s = await findStore(params.id);
+    if (s.catalog || s.catalog_build) return { body: await lookupProducts(ctx, s, query) };
+    // Onboarding preview is a bounded diagnostic sample, never a global inventory promise.
     if (CHATTRN_LIKE.includes(s.connection_type)) {
-      const result = query.query
-        ? await CC.searchProducts(ctx, s, query.query)
-        : await CC.listProducts(ctx, s, { page_info: query.page || 1, limit: 50 });
-      if (result.res.error || result.res.http !== 200) throw new HttpError(502, "store_error", `Could not load product previews (HTTP ${result.res.http ?? "unavailable"}).`);
-      const products = result.list.map((raw) => CC.toProduct(raw, s.currency));
-      return { body: { source: query.query ? "search" : "list", count: products.length, products } };
+      const result = query.query ? await CC.searchProducts(ctx, s, query.query) : await CC.listProducts(ctx, s, { page_info: query.page || 1, limit: 50 });
+      if (result.res.error || result.res.http !== 200) throw new HttpError(502, "store_error", "Could not load product previews.");
+      return { body: { source: "sample", complete: false, location_required: true, count: result.list.length,
+        products: result.list.map(raw => neutralProduct(CC.toProduct(raw, s.currency))) } };
     }
-    const zone = query.zone != null && query.zone !== "" ? { name: s.delivery.context_param, value: String(query.zone) } : null;
-    const useSearch = !!query.query && !!s.endpoints?.search;
-    const host = new URL(s.base_url).host;
-    const r = useSearch
-      ? await E.getJudged(ctx, s, "search", { query: query.query }, zone, host)
-      : await E.getJudged(ctx, s, "products", { page: String(query.page || 1) }, zone, host);
+    if (query.zone && !s.delivery?.param_confirmed) {
+      await discoverZoneParam(ctx, s);
+      await db.put(s);
+    }
+    const context = query.zone && s.delivery?.context_param ? { name: s.delivery.context_param, value: String(query.zone) } : null;
+    const r = await E.getJudged(ctx, s, query.query && s.endpoints?.search ? "search" : "products", { query: query.query, page: String(query.page || 1) }, context);
     if (r.bad) throw new HttpError(502, "store_error", r.bad.message);
-    const list = (M.extractList(r.body) || []).filter(M.isObj);
-    const products = list.map((raw) => M.toProduct(s, raw));
-    return { body: { source: useSearch ? "search" : "list", page: Number(query.page || 1), count: products.length, products } };
+    const products = (M.extractList(r.body) || []).filter(M.isObj).map(raw => M.toProduct(s, raw));
+    return { body: { source: "sample", complete: false, location_required: !context, count: products.length,
+      products: context ? products : products.map(neutralProduct) } };
   });
 
   // ---- static pages ----
@@ -817,7 +839,9 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     }
   });
 
-  return { server, ctx, db };
+  server.on("listening", () => catalogJobs.start());
+  server.on("close", () => catalogJobs.stop());
+  return { server, ctx, db, catalogJobs };
 }
 
 async function createConfiguredApp(options) {

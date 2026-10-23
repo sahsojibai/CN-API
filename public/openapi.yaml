@@ -133,6 +133,8 @@ components:
         inventory_item_id: { type: [integer, string] }
         location_id: { type: [integer, string] }
         available: { type: [integer, "null"] }
+        price: { oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }], description: Optional location-specific price. Null means unconfirmed. }
+        compare_at_price: { oneOf: [{ $ref: "#/components/schemas/Money" }, { type: "null" }] }
         updated_at: { type: string, format: date-time }
     Customer:
       type: object
@@ -223,6 +225,7 @@ components:
             products: { type: boolean }
             product_search: { type: boolean }
             inventory_levels: { type: boolean }
+            location_prices: { type: boolean, description: Inventory levels include location-specific prices; missing prices must not inherit a primary-location quote. }
             locations_resolve: { type: boolean }
             customers_search: { type: boolean }
             orders_read: { type: boolean }

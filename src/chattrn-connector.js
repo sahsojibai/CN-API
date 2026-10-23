@@ -43,6 +43,7 @@ function toProduct(raw, storeCurrency) {
   return {
     id: raw.id != null ? String(raw.id) : null,
     title: raw.title || null,
+    description: raw.body_html || raw.description || null,
     price: variants[0] ? variants[0].price : null,
     compare_at_price: variants[0] ? variants[0].compare_at_price : null,
     currency: storeCurrency || null,
