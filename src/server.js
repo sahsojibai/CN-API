@@ -7,7 +7,8 @@ const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { HttpError, assertPublicUrl } = require("./http");
 const { Db, publicView } = require("./db");
-const { loadSecretKey, encrypt } = require("./crypto");
+const { loadSecretKey, encrypt, decrypt } = require("./crypto");
+const CL = require("./chattrn-client");
 const E = require("./endpoints");
 const M = require("./mapping");
 const { runTests } = require("./test-runner");
@@ -316,46 +317,70 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   // Install status (devspec.txt): Package installed, Store linked with your token, Chattrn API
   // reachable, Tables matched, First product sync. Polled by the wizard's "Waiting for your
   // store to finish connecting" card and mirrored on the Connection (Laravel package) tab.
+  // Install status, Figma "Environment" card on Connect (step 1). Scoped to the token
+  // handshake only: whether tables are mapped is step 2's job and whether the API answers is
+  // step 3's, so neither is reported here - showing a mapping verdict before mapping has run
+  // is what the redesign set out to fix.
   route("GET", "/api/stores/:id/laravel/install-status", async ({ params }) => {
     const s = laravelStore(params.id);
     const l = s.laravel;
-    const checks = [];
-    const registered = !!l.registered_at;
-    checks.push({
-      key: "package_installed", label: "Package installed",
-      state: registered ? "pass" : "pending",
-      message: registered ? "chattrn/connector found on your server" : "Waiting for the package to register.",
-    });
-    checks.push({
-      key: "store_linked", label: "Store linked with your token",
-      state: registered ? "pass" : "pending",
-      message: registered ? `${(s.website_url || "Your store").replace(/^https?:\/\//, "")} is now linked to this workspace` : "Paste the token into .env, then run the installer.",
-    });
-    let reach = { state: "pending", message: "Waiting for the package to register." };
-    if (registered && s.chattrn.base_url) {
-      const r = await CC.checkStore(ctx, s, { websiteUrl: s.website_url });
-      reach = r.state === "connected"
-        ? { state: "pass", message: `${s.chattrn.base_url}/store.json answered` }
-        : { state: "warn", message: r.message || "Not reachable yet." };
+    const used = !!l.token_used_at;
+    const registered = !!l.registered_at && !!s.chattrn.access_token_enc;
+    const checks = [
+      {
+        key: "token_in_env", label: "CHATTRN_TOKEN present in environment",
+        state: used ? "pass" : "pending",
+        message: used ? "Found in your host's environment variables" : "Paste the token into your host's environment, then redeploy.",
+      },
+      {
+        key: "config_resolves", label: "Laravel config sees it",
+        state: used ? "pass" : "pending",
+        message: used ? "config('chattrn.connection_token') resolves" : "Waiting for the package to read it. A stale config:cache is the usual cause.",
+      },
+      {
+        key: "access_token_issued", label: "Access token issued",
+        state: registered ? "pass" : "pending",
+        message: registered ? "CHATTRN_ACCESS_TOKEN stored \u2014 registration complete" : "Run php artisan chattrn:register once the token is in place.",
+      },
+    ];
+    let masked = null;
+    if (registered) {
+      try {
+        const plain = decrypt(s.chattrn.access_token_enc, ctx.secretKey);
+        masked = plain ? plain.slice(0, 8) + "\u2022".repeat(12) + plain.slice(-16) : null;
+      } catch { masked = null; }
     }
-    checks.push({ key: "api_reachable", label: "Chattrn API reachable", ...reach });
-    const models = l.models_matched;
-    const required = ["product", "variant", "order", "customer"];
-    const missing = models ? required.filter((k) => !models[k]) : required;
-    checks.push({
-      key: "tables_matched", label: "Tables matched",
-      state: !registered ? "pending" : missing.length === 0 ? "pass" : "warn",
-      message: !registered ? "Run php artisan chattrn:map, then continue."
-        : missing.length === 0 ? "Product, Variant, Order and Customer all matched."
-        : `${missing.map((m) => m[0].toUpperCase() + m.slice(1)).join(", ")} not matched yet: run php artisan chattrn:map again to add ${missing.length > 1 ? "them" : "it"}.`,
-    });
-    checks.push({
-      key: "first_sync", label: "First product sync",
-      state: s.status === "connected" ? "pass" : "pending",
-      message: s.status === "connected" ? "Synced. Products sync every 15 minutes." : "Starts when you continue. After that, products sync every 15 minutes.",
-    });
-    const canContinue = checks[0].state === "pass" && checks[1].state === "pass" && checks[2].state === "pass";
-    return { body: { checks, can_continue: canContinue } };
+    return {
+      body: {
+        checks,
+        registered,
+        package_version: l.package_version || null,
+        access_token_masked: masked,
+        can_continue: registered,
+      },
+    };
+  });
+
+  // ---- Laravel table mapping (step 2) ----
+  // The package introspects the merchant's own Eloquent models and columns; Chattrn never
+  // guesses a schema it cannot see. These two proxy that introspection through the access
+  // token already held for this store, the same transport as every other package call.
+  route("GET", "/api/stores/:id/laravel/tables", async ({ params }) => {
+    const s = laravelStore(params.id);
+    if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
+    const res = await CL.call(ctx, s, { path: "/mapping.json" });
+    if (res.status !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not return a mapping (HTTP ${res.status}).`);
+    return { body: res.json };
+  });
+
+  route("PUT", "/api/stores/:id/laravel/mapping", async ({ params, body }) => {
+    const s = laravelStore(params.id);
+    if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
+    const res = await CL.call(ctx, s, { path: "/mapping.json", method: "PUT", body: { values: (body && body.values) || {} } });
+    if (res.status !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.status}).`);
+    s.laravel.last_seen_at = new Date().toISOString();
+    db.put(s);
+    return { body: res.json };
   });
 
   // ---- endpoints ----

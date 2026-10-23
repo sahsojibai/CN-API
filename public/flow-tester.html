@@ -192,6 +192,31 @@ select { height: 36px; }
 .badge.b-pink { background: #e8dcf8; color: var(--brand); }
 details summary { margin-top: 4px; }
 
+/* ---- Laravel wizard: Connect / Map your tables / Verify (Figma layout) ---- */
+.lock-note { display: flex; gap: 10px; align-items: flex-start; background: var(--field); border-radius: 8px; padding: 10px 12px; color: var(--muted); font-size: 12px; line-height: 18px; }
+.lock-note svg { flex: none; margin-top: 1px; }
+.lmcat { margin: 4px 0 0; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+.lmrow { display: grid; grid-template-columns: 220px minmax(240px, 1fr) 190px; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line2); }
+.lmrow.warn .lmfield input, .lmrow.warn .lmfield select { border-color: var(--warn); }
+.lmlabel .t { display: block; font-weight: 600; font-size: 13px; line-height: 20px; color: var(--fg); }
+.lmlabel .h { display: block; font-size: 12px; line-height: 18px; color: var(--muted); }
+.lmfield { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.lmfield input, .lmfield select { flex: 1 1 auto; min-width: 0; height: 36px; }
+.lmfield .mtag { margin-top: 0; flex: none; }
+.lmstatus .s { display: block; font-size: 12px; line-height: 18px; font-weight: 600; }
+.lmstatus .d { display: block; font-size: 12px; line-height: 18px; color: var(--muted); }
+.lmstatus .s.ok { color: var(--pass); }
+.lmstatus .s.warn { color: var(--warn); }
+.lmstatus .s.muted { color: var(--muted); }
+.lcard-note { margin: 10px 0 0; font-size: 12px; line-height: 18px; color: var(--muted); }
+.lsample { width: 100%; border-collapse: collapse; }
+.lsample th { text-align: left; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg-strong); padding: 10px 16px; }
+.lsample td { padding: 10px 16px; border-top: 1px solid var(--line2); font-size: 13px; line-height: 20px; color: var(--fg); vertical-align: middle; }
+.lsample .pcell { display: flex; align-items: center; gap: 10px; }
+.lsample .thumb { width: 36px; height: 36px; border-radius: 6px; background: var(--bg); flex: none; object-fit: cover; }
+.lsample .pname, .lsample .pprice { font-weight: 600; font-size: 13px; color: var(--fg); }
+.lsample .was { color: var(--muted); font-weight: 400; text-decoration: line-through; margin-left: 6px; }
+
 /* ---- Footer ---- */
 .footer { border-top: 1px solid var(--line); display: flex; justify-content: center; gap: 12px; padding: 16px 24px; margin-top: auto; }
 .footer button { padding: 8px 14px; }
@@ -520,19 +545,19 @@ details summary { margin-top: 4px; }
       </div>
         <div id="laravelWizardView" class="wizard-view" hidden>
       <header>
-        <h1 class="page-title">Laravel package &middot; Install package</h1>
-        <p class="page-sub">Your developer runs a few commands in the Laravel app. Once the package registers, it reads the same way a native Chattrn API store does.</p>
+        <h1 class="page-title" id="lPageTitle">Register with Chattrn</h1>
+        <p class="page-sub" id="lPageSub">One-time &mdash; exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes.</p>
       </header>
 
       <div class="stepper stepper-3" aria-label="Setup steps">
-        <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Install package</span><span class="s">Composer and artisan commands</span></span></button>
-        <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
-        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
+        <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">You are here</span></span></button>
+        <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Map your tables</span><span class="s">Next</span></span></button>
+        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Check it&rsquo;s live</span></span></button>
       </div>
 
-      <!-- STEP 1: Install package -->
+      <!-- STEP 1: Connect -->
       <section data-lpanel="1" style="display:flex;flex-direction:column;gap:20px">
-        <div class="card">
+        <div class="card" id="lDetailsCard">
           <div class="card-head"><div><h3>Store details</h3><p>How the store appears in Chattrn and which brand's conversations it serves.</p></div></div>
           <div class="row2">
             <div class="field"><label for="lStoreName">Store name</label><input type="text" id="lStoreName" placeholder="e.g. My store" autocomplete="off"></div>
@@ -547,7 +572,8 @@ details summary { margin-top: 4px; }
           <p class="hint" id="lDetailsErr" style="color:var(--fail)" hidden></p>
         </div>
 
-        <div class="card">
+        <!-- Shown until the package registers: the merchant needs the token and commands. -->
+        <div class="card" id="lInstallCard">
           <div class="card-head"><div><h3>Install the Chattrn package</h3><p>Have your developer run these in the Laravel app's root, in order.</p></div></div>
           <div class="cmd-row">
             <span class="num">1</span>
@@ -575,50 +601,55 @@ details summary { margin-top: 4px; }
           <div class="cmd-row">
             <span class="num">4</span>
             <div class="cmd-body">
-              <span class="cmd-title">Map the models</span>
-              <span class="cmd-sub">Asks which Eloquent models are Product, Variant, Order and Customer, then registers with Chattrn.</span>
-              <div class="cmd-line"><code>php artisan chattrn:map</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:map">Copy</button></div>
+              <span class="cmd-title">Register</span>
+              <span class="cmd-sub">Exchanges the setup token for an ongoing access token. Mapping happens in the next step, in the browser.</span>
+              <div class="cmd-line"><code>php artisan chattrn:register</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:register">Copy</button></div>
             </div>
           </div>
         </div>
 
+        <!-- Figma "Connection" card: replaces the install card once registration succeeds. -->
+        <div class="card" id="lConnectionCard" hidden>
+          <div class="card-head">
+            <div>
+              <div class="sec-title">Connection <span class="badge b-pass" style="margin-left:6px">Connected</span></div>
+              <p class="hint" style="margin-top:4px">Chattrn calls your package from its servers using this access token.</p>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="lAccessToken">Access token</label><input type="text" id="lAccessToken" readonly value="&mdash;"></div>
+            <div class="field"><label for="lPackageVer">Package</label><input type="text" id="lPackageVer" readonly value="&mdash;"></div>
+          </div>
+          <div class="lock-note">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="4" y="8" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"></rect><path d="M6 8V5.5a3 3 0 0 1 6 0V8" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg>
+            <span>Stored encrypted in your database, not in a committed config file. Chattrn only calls your package from its servers, never from a customer's browser.</span>
+          </div>
+          <div><button type="button" class="btn-grey" id="lRegenToken">Regenerate token</button> <span class="hint" id="lRegenNote" style="margin:0"></span></div>
+        </div>
+
+        <!-- Figma "Environment" card -->
         <div class="card">
           <div class="card-head">
-            <div><h3>Waiting for your store to finish connecting</h3><p>This updates automatically once the package registers.</p></div>
+            <div><div class="sec-title">Environment</div><p class="hint" style="margin-top:4px">What Chattrn can see on this install so far.</p></div>
             <button type="button" class="plain" id="lRecheck">Check again</button>
           </div>
-          <div id="lWaitRows"><div class="wait-row"><span class="wicon pending">&middot;</span><div class="wbody"><div class="wtitle">Loading&hellip;</div></div></div></div>
+          <div id="lWaitRows"><p class="hint">Fill in the website URL and generate a token below to get started.</p></div>
         </div>
       </section>
 
-      <!-- STEP 2: Test connection -->
+      <!-- STEP 2: Map your tables -->
       <section data-lpanel="2" hidden style="display:flex;flex-direction:column;gap:20px">
-        <div id="lTestPanel"></div>
+        <div id="lMapPanel"><p class="hint">Reading your app's tables&hellip;</p></div>
       </section>
 
-      <!-- STEP 3: Delivery setup -->
+      <!-- STEP 3: Verify -->
       <section data-lpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
-        <div class="card" id="lDeliveryCard">
-          <div class="card-head">
-            <div><div class="sec-title">Delivery zones</div><p class="hint" style="margin-top:4px">Zones, areas and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p></div>
-            <span class="badge b-skip">Read from GET /locations.json</span>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Zone</th><th>Areas</th><th>Minimum order</th></tr></thead>
-            <tbody id="lZoneRows"><tr><td colspan="3" class="hint">Loading zones…</td></tr></tbody>
-          </table></div>
-        </div>
-        <div class="card">
-          <div><div class="sec-title">When should the AI ask for the area?</div><p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p></div>
-          <label class="opt"><input type="radio" name="lAsk" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span></span></label>
-          <label class="opt"><input type="radio" name="lAsk"><span><span class="opt-title">At the start of every new chat</span></span></label>
-          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" id="lRemember" checked><span class="opt-title">Remember the area for returning customers</span></label>
-        </div>
+        <div id="lVerifyPanel"><p class="hint">Running the checks against your store&hellip;</p></div>
       </section>
 
       <div class="footer" style="border:0;padding:0;margin-top:0">
         <button type="button" class="plain" id="lBack">Back</button>
-        <button type="button" class="primary" id="lNext">Continue: test connection</button>
+        <button type="button" class="primary" id="lNext">Continue: map your tables</button>
       </div>
       <p class="hint" id="lFinishNote" role="status" style="margin:0;min-height:18px"></p>
       </div>
@@ -2678,12 +2709,13 @@ details summary { margin-top: 4px; }
     cState.storeId = s.id;
   }
 
-  // ---- Laravel package wizard (slice 3: Install package -> Test connection -> Delivery setup) ----
-  var lState = { step: 1, storeId: null, sniffed: false, pollTimer: null };
-  var LSTEP_NEXT = ["Continue: test connection", "Continue: delivery setup", "Finish and connect store"];
-  var LSTEP_SUB = ["Composer and artisan commands", "Data and speed", "Where you deliver"];
+  // ---- Laravel package wizard (slice 3: Connect -> Map your tables -> Verify) ----
+  var lState = { step: 1, storeId: null, sniffed: false, pollTimer: null, registered: false, mapCards: null };
+  var LSTEP_NEXT = ["Continue: map your tables", "Save mapping & continue", "Go to Chattrn dashboard"];
+  var LSTEP_SUB = ["Composer and artisan commands", "Next", "Check it's live"];
+  var LSTEP_DONE = ["Token exchanged", "Mapping saved", ""];
 
-  function resetLaravelStore() { lState.storeId = null; lState.sniffed = false; stopLaravelPoll(); }
+  function resetLaravelStore() { lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
 
   function showLaravelWizard() {
     setCrumbStore("");
@@ -2696,6 +2728,12 @@ details summary { margin-top: 4px; }
     lShowStep(1);
   }
 
+  var LSTEP_TITLE = [
+    ["Register with Chattrn", "One-time — exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes."],
+    ["Map your store", "Fields are pre-filled with best guesses from your app's actual tables. Fix anything wrong — changes save straight to the database, no redeploy needed."],
+    ["Verify your setup", "Chattrn pulls real products and orders through your mapping and checks the data, so you can see exactly what it will see."],
+  ];
+
   function lShowStep(n) {
     lState.step = Math.max(1, Math.min(3, n));
     document.querySelectorAll("[data-lpanel]").forEach(function (p) {
@@ -2703,12 +2741,16 @@ details summary { margin-top: 4px; }
     });
     document.querySelectorAll(".lstep").forEach(function (b) {
       var i = Number(b.getAttribute("data-lstep"));
+      var done = i < lState.step;
       b.classList.toggle("on", i === lState.step);
-      b.classList.toggle("done", i < lState.step);
-      b.querySelector(".num").textContent = i < lState.step ? "✓" : String(i);
-      b.querySelector(".s").textContent = i < lState.step ? "Edit" : i === lState.step ? "You are here" : LSTEP_SUB[i - 1];
+      b.classList.toggle("done", done);
+      b.querySelector(".num").textContent = done ? "✓" : String(i);
+      b.querySelector(".s").textContent = done ? LSTEP_DONE[i - 1] : i === lState.step ? "You are here" : LSTEP_SUB[i - 1];
     });
+    $("lPageTitle").textContent = LSTEP_TITLE[lState.step - 1][0];
+    $("lPageSub").textContent = LSTEP_TITLE[lState.step - 1][1];
     $("lBack").disabled = lState.step === 1;
+    $("lNext").disabled = false;
     $("lNext").textContent = LSTEP_NEXT[lState.step - 1];
     if (lState.step === 1) {
       if (lState.storeId) { loadLaravelWaitRows(); startLaravelPoll(); }
@@ -2716,8 +2758,8 @@ details summary { margin-top: 4px; }
     } else {
       stopLaravelPoll();
     }
-    if (lState.step === 2) runLaravelTest();
-    if (lState.step === 3) loadLaravelZones();
+    if (lState.step === 2) loadLaravelTables();
+    if (lState.step === 3) runLaravelVerify();
   }
   document.querySelectorAll(".lstep").forEach(function (b) {
     b.addEventListener("click", function () { if (Number(b.getAttribute("data-lstep")) <= lState.step) lShowStep(Number(b.getAttribute("data-lstep"))); });
@@ -2816,10 +2858,36 @@ details summary { margin-top: 4px; }
     }
   });
 
+  // Regenerate token (Figma: Connection card). Only available once registered.
+  $("lRegenToken").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    $("lRegenNote").style.color = "";
+    $("lRegenNote").textContent = "Regenerating…";
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("POST", "/api/stores/" + id + "/laravel/regenerate-token", {});
+      if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      $("lRegenNote").textContent = "New token issued. Update CHATTRN_ACCESS_TOKEN on your host, then redeploy.";
+      if (res.body.access_token) {
+        $("lAccessToken").value = res.body.access_token;
+      }
+      loadLaravelWaitRows();
+    } catch (e) {
+      $("lRegenNote").style.color = "var(--fail)";
+      $("lRegenNote").textContent = "Could not regenerate: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Figma "Environment" rows: same .crow/.ico pattern as Test connection.
   function waitRowHtml(c) {
-    var cls = c.state === "pass" ? "pass" : c.state === "warn" ? "warn" : "pending";
-    var icon = cls === "pass" ? "&#10003;" : cls === "warn" ? "!" : "&middot;";
-    return '<div class="wait-row"><span class="wicon ' + cls + '">' + icon + '</span><div class="wbody"><div class="wtitle">' + esc(c.label) + '</div><div class="wsub">' + esc(c.message || "") + '</div></div></div>';
+    var cls = c.state === "pass" ? "ico-pass" : c.state === "warn" ? "ico-warn" : "ico-skip";
+    var icon = c.state === "pass" ? "&#10003;" : c.state === "warn" ? "!" : "&middot;";
+    return '<div class="crow"><span class="ico ' + cls + '">' + icon + '</span><div class="crow-body">' +
+      '<span class="crow-title">' + esc(c.label) + '</span>' +
+      '<span class="hint" style="margin:0">' + esc(c.message || "") + '</span></div></div>';
   }
 
   async function loadLaravelWaitRows() {
@@ -2832,6 +2900,15 @@ details summary { margin-top: 4px; }
       var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
       if (res.http !== 200) throw new Error("HTTP " + res.http);
       $("lWaitRows").innerHTML = res.body.checks.map(waitRowHtml).join("");
+      lState.registered = !!res.body.registered;
+      // Once the package has registered, the install commands are done - swap in the
+      // Connection card (Figma frame A) in their place.
+      $("lInstallCard").hidden = lState.registered;
+      $("lConnectionCard").hidden = !lState.registered;
+      if (lState.registered) {
+        $("lAccessToken").value = res.body.access_token_masked || "Stored — hidden";
+        $("lPackageVer").value = "chattrn/connector · v" + (res.body.package_version || "?");
+      }
       $("lNext").disabled = lState.step === 1 && !res.body.can_continue;
     } catch (e) {
       $("lWaitRows").innerHTML = '<p class="hint" style="color:var(--fail)">Could not load status: ' + esc(e.message) + '</p>';
@@ -2857,6 +2934,192 @@ details summary { margin-top: 4px; }
       function () { b.textContent = "Copy blocked"; });
   });
 
+  // ---- STEP 2: Map your tables ----
+  // Rows come from the package's own introspection (Eloquent models + columns), proxied by
+  // GET /api/stores/:id/laravel/tables, so the guesses shown are the store's real schema.
+
+  function lmRowHtml(row) {
+    var statusClass = row.status === "guessed" || row.status === "matched" ? "ok" : row.status === "missing" ? "warn" : "muted";
+    var statusText = row.status === "guessed" ? "&#10003; Guessed"
+      : row.status === "matched" ? "&#10003; Matched"
+      : row.status === "missing" ? "! Not matched"
+      : "Not added";
+    var field;
+    if (row.type === "select") {
+      field = '<select data-lmkey="' + esc(row.key) + '">' +
+        (row.options || []).map(function (o) {
+          var v = typeof o === "string" ? o : o.value;
+          var t = typeof o === "string" ? o : (o.label || o.value);
+          return '<option value="' + esc(v) + '"' + (v === (row.value || "") ? " selected" : "") + ">" + esc(t) + "</option>";
+        }).join("") + "</select>";
+    } else {
+      field = '<input type="text" data-lmkey="' + esc(row.key) + '" value="' + esc(row.value || "") + '">';
+    }
+    return '<div class="lmrow' + (row.status === "missing" ? " warn" : "") + '">' +
+      '<div class="lmlabel"><span class="t">' + esc(row.title) + "</span>" +
+        (row.hint ? '<span class="h">' + esc(row.hint) + "</span>" : "") + "</div>" +
+      '<div class="lmfield">' + (row.tag ? '<span class="mtag">' + esc(row.tag) + "</span>" : "") + field + "</div>" +
+      '<div class="lmstatus"><span class="s ' + statusClass + '">' + statusText + "</span>" +
+        (row.detail ? '<span class="d">' + esc(row.detail) + "</span>" : "") + "</div>" +
+      "</div>";
+  }
+
+  // Two cards (Product & variant columns, Store) are a plain 2-up field grid in the design
+  // rather than the label/field/status row-list, so they render through .row2 instead.
+  function lmGridHtml(rows) {
+    var out = "";
+    for (var i = 0; i < rows.length; i += 2) {
+      out += '<div class="row2">' + rows.slice(i, i + 2).map(function (r) {
+        var f = '<input type="text" data-lmkey="' + esc(r.key) + '" value="' + esc(r.value || "") + '">';
+        return '<div class="field"><label>' + esc(r.title) +
+          (r.hint ? ' <span class="hint" style="margin:0">' + esc(r.hint) + "</span>" : "") +
+          "</label>" + f + "</div>";
+      }).join("") + "</div>";
+    }
+    return out;
+  }
+
+  function lmCardHtml(card) {
+    var grid = card.layout === "grid";
+    return '<div class="card">' +
+      '<div class="card-head"><div><div class="sec-title">' + esc(card.title) + "</div>" +
+        (card.hint ? '<p class="hint" style="margin-top:4px">' + esc(card.hint) + "</p>" : "") + "</div>" +
+        (card.action ? '<button type="button" class="plain" id="lRescan">' + esc(card.action) + "</button>" : "") +
+      "</div>" +
+      (card.groups || []).map(function (g) {
+        if (grid) return lmGridHtml(g.rows || []);
+        return (g.label ? '<p class="lmcat">' + esc(g.label) + "</p>" : "") + (g.rows || []).map(lmRowHtml).join("");
+      }).join("") +
+      (card.note ? '<p class="lcard-note">' + esc(card.note) + "</p>" : "") +
+      "</div>";
+  }
+
+  async function loadLaravelTables() {
+    $("lMapPanel").innerHTML = '<p class="hint">Reading your app’s tables…</p>';
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("GET", "/api/stores/" + id + "/laravel/tables");
+      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      lState.mapCards = res.body.cards || [];
+      if (!lState.mapCards.length) { $("lMapPanel").innerHTML = '<p class="hint">The package did not return any tables to map.</p>'; return; }
+      $("lMapPanel").innerHTML = lState.mapCards.map(lmCardHtml).join("");
+      var rescan = $("lRescan");
+      if (rescan) rescan.addEventListener("click", loadLaravelTables);
+    } catch (e) {
+      $("lMapPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not read your tables: ' + esc(e.message) + "</p>";
+    }
+  }
+
+  async function saveLaravelMapping() {
+    var values = {};
+    document.querySelectorAll("#lMapPanel [data-lmkey]").forEach(function (el) {
+      values[el.getAttribute("data-lmkey")] = el.value === "" ? null : el.value;
+    });
+    var id = await ensureLaravelStore();
+    var res = await backend("PUT", "/api/stores/" + id + "/laravel/mapping", { values: values });
+    if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+    return res.body;
+  }
+
+  // ---- STEP 3: Verify ----
+
+  function lVerifyRowHtml(c, withBadge) {
+    var st = c.state === "passed" || c.state === "pass" ? "pass"
+      : c.state === "failed" || c.state === "error" ? "fail"
+      : c.state === "needs_attention" || c.state === "warning" || c.state === "warn" ? "warn" : "skip";
+    var icon = st === "pass" ? "&#10003;" : st === "warn" ? "!" : st === "fail" ? "&times;" : "&middot;";
+    var badge = st === "pass" ? '<span class="badge b-pass">Passed</span>'
+      : st === "warn" ? '<span class="badge b-warn">Needs attention</span>'
+      : st === "fail" ? '<span class="badge b-fail">Failed</span>'
+      : '<span class="badge b-skip">Not configured</span>';
+    return '<div class="crow"><span class="ico ico-' + st + '">' + icon + '</span><div class="crow-body">' +
+      '<span class="crow-title">' + esc(c.label) + "</span>" +
+      '<span class="hint" style="margin:0">' + esc(c.message || "") + "</span></div>" +
+      (withBadge ? badge : "") + "</div>";
+  }
+
+  function lSampleTableHtml(products, fields) {
+    if (!products || !products.length) return '<p class="hint">No products came back through the mapping yet.</p>';
+    var rows = products.slice(0, 3).map(function (p) {
+      var v = (p.variants && p.variants[0]) || {};
+      var price = v.price != null ? v.price : p.price;
+      var was = v.compare_at_price != null ? v.compare_at_price : null;
+      var count = (p.variants || []).length;
+      var img = (p.images && p.images[0] && p.images[0].src) || p.image_url || null;
+      var qty = (p.variants || []).reduce(function (a, x) {
+        return a + (typeof x.inventory_quantity === "number" ? x.inventory_quantity : 0);
+      }, 0);
+      var hasQty = (p.variants || []).some(function (x) { return typeof x.inventory_quantity === "number"; });
+      var stock = !hasQty ? '<span class="badge b-skip">Unknown</span>'
+        : qty > 0 ? '<span class="badge b-pass">In stock</span>'
+        : '<span class="badge b-fail">Out of stock</span>';
+      return "<tr><td><div class=\"pcell\">" +
+        (img ? '<img class="thumb" src="' + esc(img) + '" alt="">' : '<span class="thumb"></span>') +
+        '<span class="pname">' + esc(p.title || "Untitled") + "</span></div></td>" +
+        '<td><span class="pprice">' + esc(price == null ? "—" : String(price)) + "</span>" +
+          (was ? '<span class="was">' + esc(String(was)) + "</span>" : "") + "</td>" +
+        "<td>" + (count > 1 ? esc(count + " variants") : "None") + "</td>" +
+        "<td>" + stock + "</td></tr>";
+    }).join("");
+    var fieldsHtml = (fields && fields.length)
+      ? '<div class="fields-wrap" style="margin-top:14px"><strong>Fields Chattrn understood</strong><div class="fields-list">' +
+          fields.map(function (f) {
+            var cls = f.state === "missing" ? "b-warn" : "b-pass";
+            var mark = f.state === "missing" ? "! " : "&#10003; ";
+            return '<span class="badge ' + cls + '">' + mark + esc(f.label) + "</span>";
+          }).join("") + "</div></div>"
+      : "";
+    return '<table class="lsample"><thead><tr><th>Product</th><th style="width:130px">Price</th><th style="width:180px">Variants</th><th style="width:110px">Stock</th></tr></thead><tbody>' +
+      rows + "</tbody></table>" + fieldsHtml;
+  }
+
+  async function runLaravelVerify() {
+    $("lVerifyPanel").innerHTML = '<p class="hint">Running the checks against your store…</p>';
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
+      var run = res.body || {};
+      var checks = run.checks || [];
+      var dq = run.data_quality || [];
+      var passed = checks.filter(function (c) { return c.state === "passed" || c.state === "pass"; }).length;
+      var attention = checks.filter(function (c) { return c.state === "needs_attention" || c.state === "warning" || c.state === "warn"; }).length;
+
+      var products = [];
+      var fields = run.fields_understood || [];
+      try {
+        var pr = await backend("GET", "/api/stores/" + id + "/products");
+        products = (pr.body && (pr.body.products || pr.body.records || pr.body.items)) || [];
+      } catch (e) { /* sample table is best-effort */ }
+
+      var banner = '<div class="banner ok">' +
+        '<span class="ico ico-pass big">&#10003;</span>' +
+        '<div class="banner-body"><strong>Connected — package registered and mapping saved</strong>' +
+        '<span class="hint" style="margin:0">chattrn/connector v' + esc($("lPackageVer").value.replace(/^.*v/, "") || "?") + ' on your Laravel app</span></div>' +
+        '<span class="hint" style="margin:0">Checked just now</span>' +
+        '<button type="button" class="primary" id="lRerun" style="background:#1c8274">Run test again</button></div>';
+
+      var testCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test results</div>' +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + "</p></div>" +
+        checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + "</div>";
+
+      var dqCard = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
+        '<p class="hint" style="margin-top:4px">A mapping can read and still send data the AI can’t use well. These checks catch that before customers do.</p></div>' +
+        (run.products_checked ? '<span class="badge b-skip">Checked on ' + esc(String(run.products_checked)) + " products</span>" : "") +
+        "</div>" + dq.map(function (c) { return lVerifyRowHtml(c, false); }).join("") + "</div>";
+
+      var sampleCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Sample products from your mapping</div>' +
+        '<p class="hint" style="margin-top:4px">Check these look right — this is how the AI Agent and the inbox will see your products.</p></div>' +
+        lSampleTableHtml(products, fields) + "</div>";
+
+      $("lVerifyPanel").innerHTML = banner + testCard + dqCard + sampleCard;
+      var rerun = $("lRerun");
+      if (rerun) rerun.addEventListener("click", runLaravelVerify);
+      $("lNext").disabled = run.can_continue === false;
+    } catch (e) {
+      $("lVerifyPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the checks: ' + esc(e.message) + "</p>";
+    }
+  }
+
   $("lNext").addEventListener("click", async function () {
     if (lState.step === 1) {
       var miss = lMissingDetails();
@@ -2880,43 +3143,25 @@ details summary { margin-top: 4px; }
       }
       return;
     }
-    if (lState.step < 3) { lShowStep(lState.step + 1); return; }
+    if (lState.step === 2) {
+      var btn = this;
+      btn.disabled = true;
+      $("lFinishNote").style.color = "";
+      $("lFinishNote").textContent = "Saving mapping…";
+      try {
+        await saveLaravelMapping();
+        $("lFinishNote").textContent = "";
+        lShowStep(3);
+      } catch (e) {
+        $("lFinishNote").style.color = "var(--fail)";
+        $("lFinishNote").textContent = "Could not save the mapping: " + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
     await finishLaravelConnection();
   });
-
-  async function runLaravelTest() {
-    var id;
-    $("lTestPanel").innerHTML = '<p class="hint">Running the 9 checks against your store…</p>';
-    try {
-      id = await ensureLaravelStore();
-      var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
-      var run = res.body;
-      var checksHtml = '<div class="card"><h3 class="card-title">Test connection</h3><div class="check-list">' +
-        run.checks.map(checkRowHtml).join("") + '</div></div>';
-      var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
-        (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
-      $("lTestPanel").innerHTML = checksHtml + dqHtml;
-      $("lNext").disabled = !run.can_continue;
-    } catch (e) {
-      $("lTestPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not run the test: ' + esc(e.message) + '</p>';
-    }
-  }
-
-  async function loadLaravelZones() {
-    $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint">Loading zones…</td></tr>';
-    try {
-      var id = await ensureLaravelStore();
-      var res = await backend("GET", "/api/stores/" + id + "/zones");
-      if (res.http !== 200) throw new Error("HTTP " + res.http);
-      var zones = res.body.zones || [];
-      if (!zones.length) { $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint">No zones returned by GET /locations.json.</td></tr>'; return; }
-      $("lZoneRows").innerHTML = zones.map(function (z) {
-        return '<tr><td>' + esc(z.name || String(z.id)) + '</td><td>' + esc((z.areas || []).join(", ") || "—") + '</td><td>' + esc(z.min_order || "—") + '</td></tr>';
-      }).join("");
-    } catch (e) {
-      $("lZoneRows").innerHTML = '<tr><td colspan="3" class="hint" style="color:var(--fail)">Could not read zones: ' + esc(e.message) + '</td></tr>';
-    }
-  }
 
   async function finishLaravelConnection() {
     var btn = $("lNext");
@@ -2928,7 +3173,7 @@ details summary { margin-top: 4px; }
       await backend("PUT", "/api/stores/" + id + "/delivery-settings", {
         mode: $("lStoreType").value,
         ask_area_when: "when_needed",
-        remember_area: $("lRemember").checked,
+        remember_area: true,
       });
       var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
       if (res.http !== 200 || !res.body.can_continue) throw new Error("The package isn't fully connected yet.");
