@@ -55,13 +55,13 @@ const FIELDS = {
   ],
 };
 
-// Samples keep their field names and types, but customer-like objects lose their values. The phone, name and
-// address are never stored.
-const PII_KEYS = /^(customer|buyer|billing|shipping|shipping_address|billing_address|contact)$/i;
+// Keep diagnostic field names while masking common personal fields and customer containers.
+// Custom merchant-specific personal fields still require explicit schema-aware handling.
+const PII_KEYS = /^(customer|buyer|billing|shipping|shipping_address|billing_address|contact|phone|phone_number|mobile|email|email_address|address|address1|address2|first_name|last_name|full_name|name)$/i;
 function maskAll(v) {
   if (Array.isArray(v)) return v.map(maskAll);
   if (isObj(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === "string" ? "•••" : maskAll(x)]));
-  return typeof v === "string" ? "•••" : v;
+  return v == null ? v : "•••";
 }
 function redact(obj) {
   if (Array.isArray(obj)) return obj.map(redact);
@@ -305,7 +305,9 @@ function fieldOptions(store, resource, compatibleWith) {
 function toMoney(v) {
   if (typeof v === "number") return Number.isFinite(v) ? v.toFixed(2) : null;
   if (typeof v === "string" && v.trim()) {
-    const n = Number(v.replace(/[^0-9.-]/g, ""));
+    const cleaned = v.trim().replace(/,/g, "");
+    if (!/^-?\d+(?:\.\d+)?$/.test(cleaned)) return null;
+    const n = Number(cleaned);
     return Number.isFinite(n) ? n.toFixed(2) : null;
   }
   return null;

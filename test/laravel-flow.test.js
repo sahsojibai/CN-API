@@ -12,6 +12,7 @@ const { createApp } = require("../src/server");
 test("Laravel pairing before mapping, validation errors, and native product previews", async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "laravel-flow-"));
   let failSaves = false;
+  let saveSuccess = false;
   let putAttempts = 0;
   const store = http.createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
@@ -21,6 +22,7 @@ test("Laravel pairing before mapping, validation errors, and native product prev
       if (req.method === "PUT") {
         putAttempts++;
         if (failSaves) { res.writeHead(502); return res.end(JSON.stringify({ error: "gateway" })); }
+        if (saveSuccess) return res.end(JSON.stringify({ saved: true }));
         res.writeHead(422);
         return res.end(JSON.stringify({ error: { code: "invalid_mapping", message: "Choose currency." }, errors: { "store.currency": ["Choose currency."] } }));
       }
@@ -43,8 +45,19 @@ test("Laravel pairing before mapping, validation errors, and native product prev
     const issued = await api("POST", `/api/stores/${id}/laravel/connection-token`, {});
     const token = issued.body.token;
     assert.ok(token);
-    const registered = await api("POST", "/package/register", { token, site_url: site, route_prefix: "/chattrn/api/2026-10" });
+    const registered = await api("POST", "/package/register", { token, registration_id: "11111111-1111-4111-8111-111111111111", site_url: site, route_prefix: "/chattrn/api/2026-10" });
     assert.equal(registered.status, 200);
+    const retry = await api("POST", "/package/register", { token, registration_id: "11111111-1111-4111-8111-111111111111", site_url: site, route_prefix: "/chattrn/api/2026-10" });
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.access_token, registered.body.access_token);
+    const other = await api("POST", "/package/register", { token, registration_id: "22222222-2222-4222-8222-222222222222", site_url: site });
+    assert.equal(other.status, 401);
+    const reconnect = await api("POST", `/api/stores/${id}/laravel/regenerate-token`, {});
+    assert.equal(reconnect.status, 200);
+    assert.ok(reconnect.body.token);
+    assert.equal(reconnect.body.access_token, undefined);
+    const { decrypt } = require("../src/crypto");
+    assert.equal(decrypt((await app.db.find(id)).chattrn.access_token_enc, app.ctx.secretKey), registered.body.access_token);
     const cards = await api("GET", `/api/stores/${id}/laravel/tables`);
     assert.equal(cards.status, 200);
     assert.equal(cards.body.cards[0].title, "Products");
@@ -60,11 +73,24 @@ test("Laravel pairing before mapping, validation errors, and native product prev
     assert.equal(interrupted.status, 503);
     assert.equal(interrupted.body.error.code, "save_unconfirmed");
     assert.equal(putAttempts, 1, "an interrupted write must never be retried automatically");
+    failSaves = false;
+    saveSuccess = true;
+    const originalPut = app.db.put.bind(app.db);
+    app.db.put = () => { throw new Error("Injected metadata failure"); };
+    try {
+      const committed = await api("PUT", `/api/stores/${id}/laravel/mapping`, { values: {} });
+      assert.equal(committed.status, 200, "optional metadata failure cannot undo a remote mapping commit");
+      assert.equal(committed.body.saved, true);
+    } finally { app.db.put = originalPut; }
     const preview = await api("GET", `/api/stores/${id}/products`);
     assert.equal(preview.status, 200);
     assert.equal(preview.body.products[0].title, "Phone");
     assert.equal(preview.body.products[0].variants[0].stock, 3);
     assert.equal(preview.body.products[0].images[0], "https://store.test/phone.jpg");
+    const pairedAgain = await api("POST", "/package/register", { token: reconnect.body.token, registration_id: "33333333-3333-4333-8333-333333333333", site_url: site, route_prefix: "/chattrn/api/2026-10" });
+    assert.equal(pairedAgain.status, 200);
+    assert.notEqual(pairedAgain.body.access_token, registered.body.access_token);
+    assert.equal(decrypt((await app.db.find(id)).chattrn.access_token_enc, app.ctx.secretKey), pairedAgain.body.access_token);
   } finally {
     app.server.closeAllConnections();
     store.closeAllConnections();

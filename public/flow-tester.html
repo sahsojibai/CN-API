@@ -452,7 +452,7 @@ details summary { margin-top: 4px; }
             </div>
             <div class="row-body">
               <div class="row-title">Map my existing API</div>
-              <div class="row-desc">Your site already has an API. AI matches its fields; nothing to rebuild.</div>
+              <div class="row-desc">Your site already has an API. Suggested matches connect its fields; nothing to rebuild.</div>
             </div>
             <button type="button" class="btn-grey row-connect" id="chooseMappedApi">Connect</button>
           </div>
@@ -620,7 +620,7 @@ details summary { margin-top: 4px; }
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="4" y="8" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"></rect><path d="M6 8V5.5a3 3 0 0 1 6 0V8" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg>
             <span>Stored encrypted in your database, not in a committed config file. Chattrn only calls your package from its servers, never from a customer's browser.</span>
           </div>
-          <div><button type="button" class="btn-grey" id="lRegenToken">Regenerate token</button> <span class="hint" id="lRegenNote" style="margin:0"></span></div>
+          <div><button type="button" class="btn-grey" id="lRegenToken">Reconnect package</button> <span class="hint" id="lRegenNote" style="margin:0"></span></div>
         </div>
 
         <!-- Figma "Environment" card -->
@@ -675,12 +675,12 @@ details summary { margin-top: 4px; }
     <div id="wizardView" class="wizard-view" hidden>
       <header>
         <h1 class="page-title">Connect a custom website</h1>
-        <p class="page-sub">Connect your own ecommerce website through its API. Products, stock and orders then work in Skills, Actions, the AI Agent, the widget and the inbox, just like a Shopify store. Nothing is saved, and only GET requests are sent.</p>
+        <p class="page-sub">Connect your own ecommerce website through its API. Products, stock and orders then work in Skills, Actions, the AI Agent, the widget and the inbox, just like a Shopify store. Connection settings and diagnostic samples are saved. Verification does not change live orders.</p>
       </header>
 
       <div class="stepper" aria-label="Setup steps">
         <button type="button" class="step" data-step="1" ><span class="num">1</span><span><span class="t" style="display:block">Your API</span><span class="s">Endpoints and sign-in</span></span></button>
-        <button type="button" class="step" data-step="2" ><span class="num">2</span><span><span class="t" style="display:block">Map fields</span><span class="s">AI matches, you check</span></span></button>
+        <button type="button" class="step" data-step="2" ><span class="num">2</span><span><span class="t" style="display:block">Map fields</span><span class="s">Suggested matches, you check</span></span></button>
         <button type="button" class="step" data-step="3" ><span class="num">3</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
         <button type="button" class="step" data-step="4" ><span class="num">4</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
       </div>
@@ -1901,7 +1901,7 @@ details summary { margin-top: 4px; }
 
   // ---- Steps -------------------------------------------------------------
   var STEP_NEXT = ["Continue: map fields with AI", "Save mapping and test connection", "Continue: delivery setup", "Finish and connect store"];
-  var STEP_SUB = ["Endpoints and sign-in", "AI matches, you check", "Data and speed", "Where you deliver"];
+  var STEP_SUB = ["Endpoints and sign-in", "Suggested matches, you check", "Data and speed", "Where you deliver"];
   function showStep(n) {
     state.step = Math.max(1, Math.min(4, n));
     document.querySelectorAll("[data-panel]").forEach(function (p) {
@@ -2419,7 +2419,7 @@ details summary { margin-top: 4px; }
         kv("Route prefix", esc(laravel.route_prefix || "—")) +
         kv("Last seen", laravel.last_seen_at ? new Date(laravel.last_seen_at).toLocaleString() : "—") +
         '<div class="detail-actions">' +
-          '<button type="button" class="btn-grey" data-act="regenerate-token">Regenerate token</button>' +
+          '<button type="button" class="btn-grey" data-act="regenerate-token">Reconnect package</button>' +
           '<button type="button" class="btn-grey" data-act="edit-config">Edit config</button>' +
           '<button type="button" class="btn-grey" data-act="run-map-again">Run chattrn:map again</button>' +
         '</div>' +
@@ -2468,12 +2468,11 @@ details summary { margin-top: 4px; }
     if (act === "disconnect") disconnectStore();
     if (act === "regenerate-token") {
       var lnote = $("laravelDetailNote");
-      if (!window.confirm("Regenerate the access token for " + detailStore.name + "? The package's old token stops working until you update its .env.")) return;
+      if (!window.confirm("Reconnect the package for " + detailStore.name + "? The current connection stays active until you deploy the new setup token.")) return;
       try {
         var rr = await backend("POST", "/api/stores/" + detailStore.id + "/laravel/regenerate-token", {});
         if (rr.http !== 200) throw new Error((rr.body.error && rr.body.error.message) || ("HTTP " + rr.http));
-        if (lnote) { lnote.style.color = ""; lnote.textContent = "New token: " + rr.body.access_token + " — set CHATTRN_ACCESS_TOKEN to this in the app's .env, then redeploy."; }
-        loadDetail(detailStore.id);
+        if (lnote) { lnote.style.color = ""; lnote.textContent = "Setup token: " + rr.body.token + " — set CHATTRN_TOKEN to this in the app's .env, then redeploy."; }
       } catch (err) {
         if (lnote) { lnote.style.color = "var(--fail)"; lnote.textContent = "Could not regenerate: " + err.message; }
       }
@@ -2495,7 +2494,6 @@ details summary { margin-top: 4px; }
         var res = await backend("PUT", "/api/stores/" + detailStore.id + "/chattrn/token", { access_token: token });
         if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
         if (note) note.textContent = "Key replaced.";
-        loadDetail(detailStore.id);
       } catch (err) {
         if (note) { note.style.color = "var(--fail)"; note.textContent = "Not saved: " + err.message; }
       }
@@ -2856,19 +2854,19 @@ details summary { margin-top: 4px; }
     }
   });
 
-  // Regenerate token (Figma: Connection card). Only available once registered.
+  // Reconnect without revoking the current key before the package is deployed.
   $("lRegenToken").addEventListener("click", async function () {
     var btn = this;
     btn.disabled = true;
     $("lRegenNote").style.color = "";
-    $("lRegenNote").textContent = "Regenerating…";
+    $("lRegenNote").textContent = "Preparing reconnect…";
     try {
       var id = await ensureLaravelStore();
       var res = await backend("POST", "/api/stores/" + id + "/laravel/regenerate-token", {});
       if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
-      $("lRegenNote").textContent = "New token issued. Update CHATTRN_ACCESS_TOKEN on your host, then redeploy.";
-      if (res.body.access_token) {
-        $("lAccessToken").value = res.body.access_token;
+      $("lRegenNote").textContent = "Setup token issued. Set CHATTRN_TOKEN on your Laravel host, then redeploy. Your current connection stays active until pairing succeeds.";
+      if (res.body.token) {
+        $("lTokenLine").textContent = "CHATTRN_TOKEN=" + res.body.token;
       }
       loadLaravelWaitRows();
     } catch (e) {

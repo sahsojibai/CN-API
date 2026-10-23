@@ -95,14 +95,14 @@ function withLimit(path, params) {
   return q.toString() ? `${path}?${q}` : path;
 }
 
-async function listProducts(ctx, store, { limit = 50, page_info, since_id, updated_at_min, fields } = {}) {
+async function listProducts(ctx, store, { limit = 50, page_info, since_id, updated_at_min, fields, next } = {}) {
   const params = {};
   if (limit) params.limit = String(limit);
   if (page_info) params.page_info = page_info;
   if (since_id) params.since_id = String(since_id);
   if (updated_at_min) params.updated_at_min = updated_at_min;
   if (fields) params.fields = fields;
-  const res = await call(ctx, store, { path: withLimit("/products.json", params) });
+  const res = await call(ctx, store, { path: next || withLimit("/products.json", params) });
   const list = res.json && Array.isArray(res.json.products) ? res.json.products : [];
   return { res, list, next: nextLinkOf(res.link) };
 }
@@ -188,14 +188,9 @@ function httpProblem(res) {
   return null;
 }
 
-async function checkStore(ctx, store, { websiteUrl, tokenOverride } = {}) {
-  const started = Date.now();
-  const first = await call(ctx, store, { path: "/store.json", tokenOverride });
-  let p = httpProblem(first);
-  if (p) return { state: "error", http_status: first.http, message: p.message, duration_ms: Date.now() - started };
-
-  const s = first.json && first.json.store;
+function validateStoreProfile(s) {
   const problems = [];
+  if (!s?.name || typeof s.name !== "string") problems.push({ path: "store.name", problem: "must be a nonempty string" });
   if (!s || typeof s !== "object") problems.push({ path: "store", problem: "must be a JSON object" });
   else {
     if (!s.api_version || !SUPPORTED_VERSIONS.includes(s.api_version)) problems.push({ path: "store.api_version", problem: `must be one of ${SUPPORTED_VERSIONS.join(", ")}` });
@@ -204,6 +199,17 @@ async function checkStore(ctx, store, { websiteUrl, tokenOverride } = {}) {
     if (!s.capabilities || s.capabilities.products !== true) problems.push({ path: "store.capabilities.products", problem: "must be true" });
     if (!["zone", "outlet"].includes(s.delivery_mode)) problems.push({ path: "store.delivery_mode", problem: "must be zone or outlet" });
   }
+  return problems;
+}
+
+async function checkStore(ctx, store, { websiteUrl, tokenOverride } = {}) {
+  const started = Date.now();
+  const first = await call(ctx, store, { path: "/store.json", tokenOverride });
+  let p = httpProblem(first);
+  if (p) return { state: "error", http_status: first.http, message: p.message, duration_ms: Date.now() - started };
+
+  const s = first.json && first.json.store;
+  const problems = validateStoreProfile(s);
   if (problems.length) {
     return { state: "error", http_status: first.http, message: `Lists up to 5 problems: ${problems.slice(0, 5).map((x) => `${x.path}: ${x.problem}`).join("; ")}`, problems: problems.slice(0, 5), duration_ms: Date.now() - started };
   }
@@ -232,7 +238,7 @@ async function checkStore(ctx, store, { websiteUrl, tokenOverride } = {}) {
 }
 
 module.exports = {
-  SUPPORTED_VERSIONS, toProduct, toVariant, toOrder, statusOf, CANON_STATUS,
+  validateStoreProfile, SUPPORTED_VERSIONS, toProduct, toVariant, toOrder, statusOf, CANON_STATUS,
   getStore, listProducts, countProducts, getProduct, searchProducts, listLocations,
   inventoryLevels, resolveArea, searchCustomers, listOrders, getOrder, checkStore, nextLinkOf,
 };

@@ -5,7 +5,7 @@
 // types can share one results screen.
 const { randomUUID } = require("node:crypto");
 const { request } = require("./http");
-const { call } = require("./chattrn-client");
+const CL = require("./chattrn-client");
 const C = require("./chattrn-connector");
 
 const TIME_LIMIT_MS = 60000;
@@ -55,12 +55,13 @@ async function runChattrnTests(ctx, store, input = {}) {
   // 1. Store profile.
   const sp = await C.getStore(ctx, store);
   const s = sp.body;
-  const profileOk = sp.res.http === 200 && s && s.name && s.currency && s.delivery_mode;
+  const profileProblems = C.validateStoreProfile(s);
+  const profileOk = sp.res.http === 200 && !sp.res.error && profileProblems.length === 0;
   checks.push({
     label: "Store profile", state: profileOk ? "passed" : "failed",
     message: profileOk
       ? `Valid schema; name "${s.name}", currency ${s.currency}, delivery mode ${s.delivery_mode}.${s.iana_timezone ? "" : " Optional: timezone not set."}`
-      : `Store profile is invalid${s ? ": check " + [!s.name && "store name", !s.currency && "currency", !s.delivery_mode && "delivery mode"].filter(Boolean).join(", ") : ": HTTP " + sp.res.http}. Review store settings and rerun.`,
+      : `Store profile is invalid (HTTP ${sp.res.http}): ${profileProblems.map(p => p.path + ": " + p.problem).join("; ")}. Review store settings and rerun.`,
     blocking: true,
   });
   if (profileOk) { store.currency = s.currency; store.country_code = s.country_code || store.country_code; store.chattrn.capabilities = s.capabilities || {}; }
@@ -68,14 +69,16 @@ async function runChattrnTests(ctx, store, input = {}) {
 
   // 2. Catalog.
   let productList = [];
+  let expectedCount = null;
   if (profileOk) {
     const cnt = await C.countProducts(ctx, store);
     const lp = await C.listProducts(ctx, store, { limit: 5 });
-    productList = lp.list;
+    productList = lp.res?.http === 200 && !lp.res.error ? lp.list : [];
     store.samples = { ...(store.samples || {}), product: productList.slice(0, 5) };
     const valid = productList.filter((p) => p.id != null && p.title && Array.isArray(p.variants) && p.variants.length);
     const count = cnt.count;
-    if (!count || !productList.length) checks.push({ label: "Catalog", state: "failed", message: "No products came back.", blocking: true });
+    expectedCount = count;
+    if (cnt.res?.http !== 200 || cnt.res.error || !Number.isSafeInteger(count) || count < 1 || !productList.length) checks.push({ label: "Catalog", state: "failed", message: "No products came back.", blocking: true });
     else if (valid.length === productList.length) checks.push({ label: "Catalog", state: "passed", message: `${count} products. ${valid.length} of ${productList.length} sampled have a title and variants.`, blocking: true });
     else checks.push({ label: "Catalog", state: "needs_attention", message: `Some of the ${productList.length} sampled products are missing an ID, title, or variants. Review Product name and Variant model mappings.`, blocking: true });
   } else {
@@ -106,14 +109,15 @@ async function runChattrnTests(ctx, store, input = {}) {
     for (const id of sampleIds) {
       if (over()) break;
       const r = await C.getProduct(ctx, store, id);
-      timings.push(r.res.ms);
-      if (r.body) rows.push(C.toProduct(r.body, s && s.currency));
+      if (r.res.http === 200 && !r.res.error && r.body) timings.push(r.res.ms);
+      if (r.res.http === 200 && !r.res.error && r.body) rows.push(C.toProduct(r.body, s && s.currency));
     }
     const p95 = percentile(timings, 0.95);
     const missing = rows.filter((p) => p.price == null || p.stock == null).length;
     let state = "passed";
     let message = `${rows.length} of ${rows.length} checked have a price and stock. p95 ${p95} ms.`;
-    if (missing) { state = "needs_attention"; message = `Stock missing on ${missing} of ${rows.length}.`; }
+    if (rows.length !== sampleIds.length) { state = "needs_attention"; message = `Only ${rows.length} of ${sampleIds.length} product reads succeeded. Retry or check the product endpoint.`; }
+    else if (missing) { state = "needs_attention"; message = `Stock missing on ${missing} of ${rows.length}.`; }
     else if (p95 > P95_MS) { state = "needs_attention"; message = `Slow: p95 ${p95} ms. Aim for ${P95_MS} ms or less.`; }
     checks.push({ label: "Live stock and price", state, message });
   }
@@ -125,12 +129,14 @@ async function runChattrnTests(ctx, store, input = {}) {
     const first = await C.listOrders(ctx, store, { status: "any" });
     if (first.res.http === 401 || first.res.http === 403) {
       checks.push({ label: "Order lookup", state: "needs_attention", message: `The key can't read orders (HTTP ${first.res.http}).` });
+    } else if (first.res.http !== 200 || first.res.error) {
+      checks.push({ label: "Order lookup", state: "needs_attention", message: `Order read failed (HTTP ${first.res.http}).` });
     } else if (!first.list.length) {
       checks.push({ label: "Order lookup", state: "needs_attention", message: "No orders yet to test with." });
     } else {
       const phone = first.list[0].phone;
       const again = await C.listOrders(ctx, store, { phone });
-      const refound = again.list.some((o) => String(o.id) === String(first.list[0].id));
+      const refound = !!phone && again.res.http === 200 && !again.res.error && again.list.some((o) => String(o.id) === String(first.list[0].id));
       store.samples = { ...(store.samples || {}), order_id: first.list[0].id };
       checks.push({ label: "Order lookup", state: refound ? "passed" : "needs_attention", message: `${refound ? "Found again" : "Not found"} through phone lookup (phone ${mask(phone)}).` });
     }
@@ -144,23 +150,30 @@ async function runChattrnTests(ctx, store, input = {}) {
   } else {
     const r = await C.getOrder(ctx, store, store.samples.order_id);
     const canon = r.order && C.toOrder(r.order);
-    const ok = canon && canon.total != null && canon.currency;
+    const ok = r.res.http === 200 && !r.res.error && canon && canon.total != null && canon.currency;
     checks.push({ label: "Order details", state: ok ? "passed" : "needs_attention", message: ok ? `Status "${canon.status}", ${canon.items_count} item(s), total ${canon.total} ${canon.currency}.` : "Missing currency or totals." });
   }
 
   // 7. Cart quote.
   if (caps.draft_orders === false) {
     checks.push({ label: "Cart quote", state: "not_supported", message: "draft_orders is false." });
-  } else if (productList.length) {
+  } else if (input.allow_test_writes !== true) {
+    checks.push({ label: "Cart quote", state: "not_run", message: "Not tested: creating a draft is a write. Use a sandbox or disposable fixtures to verify this capability." });
+  } else if (productList.length && productList[0].variants?.length) {
     const variant = productList[0].variants[0];
-    const created = await call(ctx, store, {
+    const created = await CL.call(ctx, store, {
       path: "/draft_orders.json", method: "POST",
       body: { draft_order: { line_items: [{ variant_id: variant.id, quantity: 1 }] } },
     });
     if (created.http === 404 || created.http === 422) {
       checks.push({ label: "Cart quote", state: "needs_attention", message: "Couldn't create a draft order (cart, coupons and checkout in chat stay off)." });
     } else if (created.http === 201 || created.http === 200 || created.http === 202) {
-      checks.push({ label: "Cart quote", state: "passed", message: "201 then 200 · totals present." });
+      const draft = created.json?.draft_order;
+      const validMoney = v => typeof v === "string" && /^\d+(?:\.\d+)?$/.test(v);
+      const valid = !created.error && draft?.id != null && draft.currency === s.currency &&
+        [draft.subtotal_price, draft.total_price, draft.total_tax].every(validMoney) &&
+        Array.isArray(draft.line_items) && draft.line_items.length > 0;
+      checks.push({ label: "Cart quote", state: valid ? "passed" : "needs_attention", message: valid ? `HTTP ${created.http} · draft totals and currency present. Update and completion were not tested.` : "Draft response is missing valid amounts, currency, ID or line items." });
     } else {
       checks.push({ label: "Cart quote", state: "needs_attention", message: `HTTP ${created.http ?? "—"}.` });
     }
@@ -177,9 +190,23 @@ async function runChattrnTests(ctx, store, input = {}) {
   checks.push({ label: "Update order", state: "not_supported", message: "Address changes stay with your team." });
 
   // Data quality on up to 50 active products.
-  const page = await C.listProducts(ctx, store, { limit: 50 });
-  const all = page.list;
-  const sample = all.map((raw) => C.toProduct(raw, s && s.currency));
+  let page = profileOk ? await C.listProducts(ctx, store, { limit: 50 }) : { res: { http: 0 }, list: [] };
+  const all = [];
+  const seenPages = new Set();
+  let pagesRead = 0;
+  let pagesComplete = false;
+  while (!over() && pagesRead < 40) {
+    if (page.res?.http !== 200 || page.res.error || !Array.isArray(page.list)) break;
+    all.push(...page.list);
+    pagesRead++;
+    if (!page.next) { pagesComplete = true; break; }
+    if (seenPages.has(page.next)) break;
+    seenPages.add(page.next);
+    try { page = await C.listProducts(ctx, store, { next: page.next, limit: 50 }); }
+    catch { break; }
+  }
+  if (new Set(all.map(p => String(p.id))).size !== all.length || all.length !== expectedCount) pagesComplete = false;
+  const sample = all.slice(0, 50).map((raw) => C.toProduct(raw, s && s.currency));
   const n = sample.length;
   const dq = [];
   if (n) {
@@ -217,9 +244,9 @@ async function runChattrnTests(ctx, store, input = {}) {
     ? { label: "Live stock speed", state: "pass", message: `p95 ${p95All} ms over ${timings.length} calls.` }
     : { label: "Live stock speed", state: "warning", message: `Around ${p95All != null ? (p95All / 1000).toFixed(1) : "?"} s per check. Customers will see 'checking with the store…'. Aim for under 1 s.` });
 
-  dq.push(page.next || all.length < 50
-    ? { label: "All pages load", state: "pass", message: page.next ? `Page 1 read; the Link header points to the next page.` : `All ${all.length} product(s) read on page 1.` }
-    : { label: "All pages load", state: "warning", message: "The last page has no next Link header, but more products may exist." });
+  dq.push(pagesComplete && all.length > 0
+    ? { label: "All pages load", state: "pass", message: `Read ${all.length} products across ${pagesRead} page(s).` }
+    : { label: "All pages load", state: "warning", message: "Could not confirm the complete catalog. A page failed, repeated, or exceeded the time/page limit." });
 
   const sampleProducts = pickSamples(sample);
   const fields = [
@@ -239,7 +266,7 @@ async function runChattrnTests(ctx, store, input = {}) {
     finished_at: new Date().toISOString(),
     duration_ms: Date.now() - started,
     phone: null,
-    can_continue: checks.some((c) => c.label === "Store profile" && c.state === "passed") && checks.some((c) => c.label === "Catalog" && c.state === "passed"),
+    can_continue: ["Store profile", "Catalog", "Live stock and price", ...(caps.product_search === false ? [] : ["Product search"])].every(label => checks.some(c => c.label === label && c.state === "passed")) && pagesComplete && all.length > 0,
     checks,
     data_quality: dq,
     sample_products: sampleProducts,

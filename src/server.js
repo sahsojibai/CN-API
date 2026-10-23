@@ -20,6 +20,16 @@ const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
 const { ensurePackageReady } = require("./package-ready");
 
+// Serialize exchanges within this process; PostgreSQL revisions protect cross-process writes.
+const registrationLocks = new Map();
+async function withRegistrationLock(key, fn) {
+  const previous = registrationLocks.get(key) || Promise.resolve();
+  const operation = previous.catch(() => {}).then(fn);
+  registrationLocks.set(key, operation);
+  try { return await operation; }
+  finally { if (registrationLocks.get(key) === operation) registrationLocks.delete(key); }
+}
+
 const AUTH_MODES = ["none", "key", "bearer", "basic"];
 const DELIVERY_MODES = ["zone", "outlet"];
 const ASK_WHEN = ["always", "when_needed", "never"];
@@ -276,46 +286,50 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("POST", "/package/register", async ({ body }) => {
     const token = typeof body.token === "string" ? body.token.trim() : "";
     if (!token) throw new HttpError(400, "token_required", "Missing connection token.");
-    const s = await db.findByLaravelTokenHash(LT.hashToken(token));
-    if (!s) throw new HttpError(401, "token_invalid", "Token rejected.");
-    const check = LT.verifyConnectionToken(s, token);
-    if (!check.ok) throw new HttpError(check.reason === "token_expired" ? 410 : 401, check.reason, check.message);
+    return withRegistrationLock(LT.hashToken(token), async () => {
+      const s = await db.findByLaravelTokenHash(LT.hashToken(token));
+      if (!s) throw new HttpError(401, "token_invalid", "Token rejected.");
+      const siteUrl = typeof body.site_url === "string" ? body.site_url.trim().replace(/\/+$/, "") : "";
+      const routePrefix = typeof body.route_prefix === "string" && body.route_prefix.trim() ? body.route_prefix.trim().replace(/^\/?/, "/").replace(/\/+$/, "") : "/chattrn/v1";
+      if (!siteUrl) throw new HttpError(400, "site_url_required", "Missing site_url.");
+      const attempt = typeof body.registration_id === "string" && /^[a-f0-9-]{36}$/.test(body.registration_id) ? body.registration_id : null;
+      const retry = s.laravel.token_used_at && attempt && s.laravel.registration_id === attempt &&
+        s.chattrn.base_url === siteUrl + routePrefix && new Date(s.laravel.token_expires_at) > new Date();
+      if (retry) return { body: { access_token: decrypt(s.chattrn.access_token_enc, ctx.secretKey), store_id: s.id } };
+      const check = LT.verifyConnectionToken(s, token);
+      if (!check.ok) throw new HttpError(check.reason === "token_expired" ? 410 : 401, check.reason, check.message);
+      await assertPublicUrl(siteUrl);
 
-    const siteUrl = typeof body.site_url === "string" ? body.site_url.trim().replace(/\/+$/, "") : "";
-    const routePrefix = typeof body.route_prefix === "string" && body.route_prefix.trim() ? body.route_prefix.trim().replace(/^\/?/, "/").replace(/\/+$/, "") : "/chattrn/v1";
-    if (!siteUrl) throw new HttpError(400, "site_url_required", "Missing site_url.");
-    await assertPublicUrl(siteUrl);
-
-    const accessKey = LT.newToken();
-    const now = new Date().toISOString();
-    s.laravel.token_used_at = now;
-    s.laravel.package_version = body.package_version ? String(body.package_version).slice(0, 40) : s.laravel.package_version;
-    s.laravel.framework_version = body.framework_version ? String(body.framework_version).slice(0, 40) : s.laravel.framework_version;
-    s.laravel.route_prefix = routePrefix;
-    if (body.models_matched && typeof body.models_matched === "object") {
-      s.laravel.models_matched = {
-        product: !!body.models_matched.product, variant: !!body.models_matched.variant,
-        order: !!body.models_matched.order, customer: !!body.models_matched.customer,
-      };
-    }
-    s.laravel.registered_at = s.laravel.registered_at || now;
-    s.laravel.last_seen_at = now;
-    s.chattrn.base_url = siteUrl + routePrefix;
-    s.chattrn.access_token_enc = encrypt(accessKey, ctx.secretKey);
-    await db.put(s);
-    return { body: { access_token: accessKey, store_id: s.id } };
+      const accessKey = LT.newToken();
+      const now = new Date().toISOString();
+      s.laravel.token_used_at = now;
+      s.laravel.registration_id = attempt;
+      s.laravel.package_version = body.package_version ? String(body.package_version).slice(0, 40) : s.laravel.package_version;
+      s.laravel.framework_version = body.framework_version ? String(body.framework_version).slice(0, 40) : s.laravel.framework_version;
+      s.laravel.route_prefix = routePrefix;
+      if (body.models_matched && typeof body.models_matched === "object") {
+        s.laravel.models_matched = {
+          product: !!body.models_matched.product, variant: !!body.models_matched.variant,
+          order: !!body.models_matched.order, customer: !!body.models_matched.customer,
+        };
+      }
+      s.laravel.registered_at = s.laravel.registered_at || now;
+      s.laravel.last_seen_at = now;
+      s.chattrn.base_url = siteUrl + routePrefix;
+      s.chattrn.access_token_enc = encrypt(accessKey, ctx.secretKey);
+      await db.put(s);
+      return { body: { access_token: accessKey, store_id: s.id } };
+    });
   });
 
-  // Rotates the access key the package uses. Spec: "Regenerating the token revokes the old
-  // access key" - immediate, not gated behind a live check since the package hasn't seen the
-  // new value yet. The new key is shown once; after that only its last 4 characters are kept.
+  // Legacy route name retained for clients; reconnect issues a setup token without revoking access.
   route("POST", "/api/stores/:id/laravel/regenerate-token", async ({ params }) => {
     const s = await laravelStore(params.id);
     if (!s.laravel.registered_at) throw new HttpError(409, "not_registered", "The package hasn't registered yet, so there's no token to regenerate.");
-    const accessKey = LT.newToken();
-    s.chattrn.access_token_enc = encrypt(accessKey, ctx.secretKey);
+    // Re-pair using a setup token; keep the working access key until the package exchanges it.
+    const issued = LT.issueConnectionToken(s);
     await db.put(s);
-    return { body: { access_token: accessKey } };
+    return { body: { ...issued, reconnect: true } };
   });
 
   // Install status (devspec.txt): Package installed, Store linked with your token, Chattrn API
@@ -401,7 +415,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http || "unavailable"}).`);
     }
     s.laravel.last_seen_at = new Date().toISOString();
-    await db.put(s);
+    // Mapping is already committed remotely; optional metadata must not turn success into failure.
+    try { await db.put(s); } catch (error) { console.warn("Mapping saved; last-seen metadata update failed", error.code || "storage_error"); }
     return { body: res.json };
   });
 
