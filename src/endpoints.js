@@ -238,13 +238,14 @@ async function evalProducts(ctx, store, values, context, host) {
   let list = p1.bad ? [] : M.extractList(p1.body);
   if (!list) return needs(`No list found. Top-level keys: ${keysOf(p1.body)}.`, p1.res);
 
-  // Zone-less stores return 200 with an empty list. Try the first zone so the check can say so.
+  // Discover a representative location without restricting the whole-store import.
   if (!list.length && !defaultContext(store, context)) {
     // The store's zone parameter is found by testing, not assumed. Find it now if it isn't known yet.
-    if (!store.delivery?.context_param) {
+    if (!store.delivery?.param_confirmed) {
       const { discoverZoneParam } = require("./location");
       const discovery = await discoverZoneParam(ctx, store, { host });
       if (discovery.retryable) return { ...needs(discovery.message, p1.res), retryable: true };
+      if (discovery.state !== "passed") return needs(discovery.message, p1.res);
     }
     const z = await getJudged(ctx, store, "zones", {}, null, host);
     const zones = z.bad ? [] : M.extractList(z.body) || [];

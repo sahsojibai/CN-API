@@ -137,3 +137,20 @@ test("bounded discovery resumes its saved cursor instead of restarting or asking
   assert.equal(result.state,'passed');assert.equal(new Set(visited).size,visited.length);
   assert.equal(store.delivery.context_param,'zoneId');assert.equal(store.delivery.zone_value,undefined);
 });
+
+for (const conflicting of [false, true]) {
+  test(`location aliases with ${conflicting ? 'conflicting' : 'identical'} products are handled explicitly`, async t => {
+    const E = require('../src/endpoints');
+    t.mock.method(E, 'getJudged', async () => ({body:{configured:true,zones:[{id:'east',name:'East'}]}}));
+    t.mock.method(E, 'judgedPath', async (_ctx,_store,opts) => ({res:{http:200},body:{products:
+      ['zoneId','zone_id'].includes(opts.context?.name)
+        ? [{id:'rice',name:'Rice',sellPrice: conflicting && opts.context.name==='zone_id' ? 20 : 10}]
+        : [], total:0,page:1,pages:0}}));
+    const store={base_url:'https://store.test',delivery:{},endpoints:{products:{path:'/products?page=:page'}}};
+    const result=await require('../src/location').discoverZoneParam({},store);
+    assert.equal(result.state, conflicting ? 'needs_attention' : 'passed');
+    assert.deepEqual(result.matched,['zoneId','zone_id']);
+    if (conflicting) assert.match(result.message,/Several location parameters match/);
+    else { assert.equal(store.delivery.context_param,'zoneId'); assert.equal(store.delivery.sample_location_id,'east'); }
+  });
+}
