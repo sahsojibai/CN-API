@@ -25,9 +25,12 @@ const ASK_WHEN = ["always", "when_needed", "never"];
 const CONNECTION_TYPES = ["mapped_api", "chattrn_api", "laravel_package"];
 const CHATTRN_LIKE = ["chattrn_api", "laravel_package"]; // both read through the native Chattrn connector
 
-function createApp({ dataDir, publicDir, adminToken, secretKey }) {
-  const db = new Db(path.join(dataDir, "stores.json"));
+function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
+  const db = database || new Db(path.join(dataDir, "stores.json"));
   const ctx = { db, secretKey: secretKey || loadSecretKey(dataDir) };
+  const auth = require("./admin-auth").createAdminAuth(adminToken, !!process.env.RENDER || process.env.NODE_ENV === "production");
+  let loginFailures = 0;
+  let loginWindow = Date.now();
   const routes = [];
 
   const route = (method, pattern, handler) => {
@@ -36,8 +39,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     routes.push({ method, re, keys, handler });
   };
 
-  const findStore = (id) => {
-    const s = db.find(id);
+  const findStore = async (id) => {
+    const s = await db.find(id);
     if (!s) throw new HttpError(404, "store_not_found", "No store with that id.");
     return s;
   };
@@ -64,9 +67,9 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
 
   // ---- stores ----
 
-  route("GET", "/api/health", () => ({ body: { ok: true, version: "0.1.0" } }));
+  route("GET", "/api/health", async () => ({ body: { ok: true, version: "0.1.0" } }));
 
-  route("GET", "/api/stores", () => ({ body: { stores: db.list() } }));
+  route("GET", "/api/stores", async () => ({ body: { stores: await db.list() } }));
 
   const cleanChattrnBase = (raw) => {
     if (typeof raw !== "string" || !raw.trim()) throw new HttpError(400, "base_url_required", "Enter the base URL of your Chattrn API.");
@@ -111,7 +114,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
           capabilities: null,
         },
       };
-      db.put(store);
+      await db.put(store);
       return { status: 201, body: publicView(store) };
     }
 
@@ -130,7 +133,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
           registered_at: null, last_seen_at: null,
         },
       };
-      db.put(store);
+      await db.put(store);
       return { status: 201, body: publicView(store) };
     }
 
@@ -153,15 +156,15 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
       },
       mapping: {},
     };
-    db.put(store);
+    await db.put(store);
     return { status: 201, body: publicView(store) };
   });
 
-  route("GET", "/api/stores/:id", ({ params }) => ({ body: publicView(findStore(params.id)) }));
+  route("GET", "/api/stores/:id", async ({ params }) => ({ body: publicView(await findStore(params.id)) }));
 
   // Replace key: the new key is tested first. If it fails, the old key keeps working.
   route("PUT", "/api/stores/:id/auth", async ({ params, body }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const a = validateAuth(body, s.auth);
     let secret_enc = s.auth.secret_enc;
     if (a.mode === "none") secret_enc = null;
@@ -174,40 +177,40 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
       throw new HttpError(400, "key_required", "Enter the key for this sign-in method.");
     }
     s.auth = { mode: a.mode, header: a.header, secret_enc };
-    db.put(s);
+    await db.put(s);
     return { body: publicView(s) };
   });
 
   // Disconnect keeps the store and its saved sign-in, but it leaves the connected list.
-  route("POST", "/api/stores/:id/disconnect", ({ params }) => {
-    const s = findStore(params.id);
+  route("POST", "/api/stores/:id/disconnect", async ({ params }) => {
+    const s = await findStore(params.id);
     s.status = "disconnected";
-    db.put(s);
+    await db.put(s);
     return { body: publicView(s) };
   });
 
   route("POST", "/api/stores/:id/connection/check", async ({ params }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const r = await E.getJudged(ctx, s, "products", { page: "1" }, null);
     if (r.bad) {
       return { body: { state: "error", http_status: r.bad.http, message: r.bad.message, duration_ms: r.res.ms } };
     }
     s.status = "connected";
-    db.put(s);
+    await db.put(s);
     return { body: { state: "connected", http_status: r.res.http, message: "Connected. The product list responded.", duration_ms: r.res.ms } };
   });
 
   // ---- Chattrn API connection (native connector, slice 1B) ----
 
-  const chattrnStore = (id) => {
-    const s = findStore(id);
+  const chattrnStore = async (id) => {
+    const s = await findStore(id);
     if (!CHATTRN_LIKE.includes(s.connection_type)) throw new HttpError(409, "wrong_connection_type", "This store isn't connected through the Chattrn API.");
     return s;
   };
 
   // Validates store.json and that products.json reads too (devspec.txt: "API connection check").
   route("POST", "/api/stores/:id/chattrn/check", async ({ params }) => {
-    const s = chattrnStore(params.id);
+    const s = await chattrnStore(params.id);
     const result = await CC.checkStore(ctx, s, { websiteUrl: s.website_url });
     if (result.state === "connected" && result.store) {
       s.currency = result.store.currency;
@@ -216,34 +219,34 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
       s.chattrn.api_version = result.store.api_version;
       s.chattrn.capabilities = result.store.capabilities || {};
       s.status = "connected";
-      db.put(s);
+      await db.put(s);
     }
     return { body: result };
   });
 
   // Replace key: the new token is tried first. If it fails, the old token keeps working.
   route("PUT", "/api/stores/:id/chattrn/token", async ({ params, body }) => {
-    const s = chattrnStore(params.id);
+    const s = await chattrnStore(params.id);
     const token = typeof body.access_token === "string" ? body.access_token.trim() : "";
     if (!token || token.length > 512) throw new HttpError(400, "token_required", "Enter the new access token (up to 512 characters).");
     const result = await CC.checkStore(ctx, s, { websiteUrl: s.website_url, tokenOverride: token });
     if (result.state !== "connected") throw new HttpError(422, "token_rejected", `The token wasn't saved. Your old token still works. ${result.message}`);
     s.chattrn.access_token_enc = encrypt(token, ctx.secretKey);
-    db.put(s);
+    await db.put(s);
     return { body: publicView(s) };
   });
 
   // The Connection tab's per-endpoint status list: the checks from the latest test run, if any.
-  route("GET", "/api/stores/:id/chattrn/endpoints", ({ params }) => {
-    const s = chattrnStore(params.id);
+  route("GET", "/api/stores/:id/chattrn/endpoints", async ({ params }) => {
+    const s = await chattrnStore(params.id);
     const run = (s.test_runs || [])[0];
     return { body: { checked_at: run ? run.finished_at : null, checks: run ? run.checks : [] } };
   });
 
   // ---- Laravel package installer (slice 3; reads through the same native Chattrn connector) ----
 
-  const laravelStore = (id) => {
-    const s = findStore(id);
+  const laravelStore = async (id) => {
+    const s = await findStore(id);
     if (s.connection_type !== "laravel_package") throw new HttpError(409, "wrong_connection_type", "This store isn't set up for the Laravel package.");
     return s;
   };
@@ -259,10 +262,10 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
 
   // Mints a fresh one-time CHATTRN_TOKEN for the install commands. Each call replaces any
   // still-pending token, so only the most recently shown value will register.
-  route("POST", "/api/stores/:id/laravel/connection-token", ({ params }) => {
-    const s = laravelStore(params.id);
+  route("POST", "/api/stores/:id/laravel/connection-token", async ({ params }) => {
+    const s = await laravelStore(params.id);
     const issued = LT.issueConnectionToken(s);
-    db.put(s);
+    await db.put(s);
     return { body: issued };
   });
 
@@ -272,7 +275,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   route("POST", "/package/register", async ({ body }) => {
     const token = typeof body.token === "string" ? body.token.trim() : "";
     if (!token) throw new HttpError(400, "token_required", "Missing connection token.");
-    const s = db.findByLaravelTokenHash(LT.hashToken(token));
+    const s = await db.findByLaravelTokenHash(LT.hashToken(token));
     if (!s) throw new HttpError(401, "token_invalid", "Token rejected.");
     const check = LT.verifyConnectionToken(s, token);
     if (!check.ok) throw new HttpError(check.reason === "token_expired" ? 410 : 401, check.reason, check.message);
@@ -298,19 +301,19 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     s.laravel.last_seen_at = now;
     s.chattrn.base_url = siteUrl + routePrefix;
     s.chattrn.access_token_enc = encrypt(accessKey, ctx.secretKey);
-    db.put(s);
+    await db.put(s);
     return { body: { access_token: accessKey, store_id: s.id } };
   });
 
   // Rotates the access key the package uses. Spec: "Regenerating the token revokes the old
   // access key" - immediate, not gated behind a live check since the package hasn't seen the
   // new value yet. The new key is shown once; after that only its last 4 characters are kept.
-  route("POST", "/api/stores/:id/laravel/regenerate-token", ({ params }) => {
-    const s = laravelStore(params.id);
+  route("POST", "/api/stores/:id/laravel/regenerate-token", async ({ params }) => {
+    const s = await laravelStore(params.id);
     if (!s.laravel.registered_at) throw new HttpError(409, "not_registered", "The package hasn't registered yet, so there's no token to regenerate.");
     const accessKey = LT.newToken();
     s.chattrn.access_token_enc = encrypt(accessKey, ctx.secretKey);
-    db.put(s);
+    await db.put(s);
     return { body: { access_token: accessKey } };
   });
 
@@ -322,25 +325,25 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   // step 3's, so neither is reported here - showing a mapping verdict before mapping has run
   // is what the redesign set out to fix.
   route("GET", "/api/stores/:id/laravel/install-status", async ({ params }) => {
-    const s = laravelStore(params.id);
+    const s = await laravelStore(params.id);
     const l = s.laravel;
     const used = !!l.token_used_at;
     const registered = !!l.registered_at && !!s.chattrn.access_token_enc;
     const checks = [
       {
-        key: "token_in_env", label: "CHATTRN_TOKEN present in environment",
+        key: "token_in_env", label: "Setup token accepted",
         state: used ? "pass" : "pending",
-        message: used ? "Found in your host's environment variables" : "Paste the token into your host's environment, then redeploy.",
+        message: used ? "Chattrn accepted the one-time setup token" : "Paste the token into your host's environment, then redeploy.",
       },
       {
-        key: "config_resolves", label: "Laravel config sees it",
+        key: "config_resolves", label: "Store paired with Chattrn",
         state: used ? "pass" : "pending",
-        message: used ? "config('chattrn.connection_token') resolves" : "Waiting for the package to read it. A stale config:cache is the usual cause.",
+        message: used ? "Pairing exchange completed" : "Waiting for the package to read it. A stale config:cache is the usual cause.",
       },
       {
         key: "access_token_issued", label: "Access token issued",
         state: registered ? "pass" : "pending",
-        message: registered ? "CHATTRN_ACCESS_TOKEN stored \u2014 registration complete" : "Run php artisan chattrn:register once the token is in place.",
+        message: registered ? "Chattrn saved its credential; Verify checks that the store accepts it" : "Run php artisan chattrn:register once the token is in place.",
       },
     ];
     let masked = null;
@@ -366,29 +369,39 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   // guesses a schema it cannot see. These two proxy that introspection through the access
   // token already held for this store, the same transport as every other package call.
   route("GET", "/api/stores/:id/laravel/tables", async ({ params }) => {
-    const s = laravelStore(params.id);
+    const s = await laravelStore(params.id);
     if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
     const res = await CL.call(ctx, s, { path: "/mapping.json" });
-    if (res.status !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not return a mapping (HTTP ${res.status}).`);
+    if (res.http !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not return a mapping (HTTP ${res.http}).`);
     return { body: res.json };
   });
 
+  route("POST", "/api/stores/:id/laravel/mapping/preview", async ({ params, body }) => {
+    const s = await laravelStore(params.id);
+    if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "Pair your store first.");
+    const result = await CL.call(ctx, s, { path: "/mapping/preview.json", method: "POST", body: { values: body.values || {} } });
+    if (result.http === 404) throw new HttpError(409, "package_update_required", "Update the Laravel package to refresh column choices before saving.");
+    if (!result.json || result.error) throw new HttpError(502, "preview_failed", "Could not preview mappings. Your saved mappings were not changed.");
+    return { status: result.http || 502, body: result.json };
+  });
+
   route("PUT", "/api/stores/:id/laravel/mapping", async ({ params, body }) => {
-    const s = laravelStore(params.id);
+    const s = await laravelStore(params.id);
     if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
     const res = await CL.call(ctx, s, { path: "/mapping.json", method: "PUT", body: { values: (body && body.values) || {} } });
-    if (res.status !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.status}).`);
+    if (res.http === 422 && res.json) return { status: 422, body: res.json };
+    if (res.http !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http}).`);
     s.laravel.last_seen_at = new Date().toISOString();
-    db.put(s);
+    await db.put(s);
     return { body: res.json };
   });
 
   // ---- endpoints ----
 
-  route("GET", "/api/stores/:id/endpoints", ({ params }) => ({ body: { endpoints: E.listEndpoints(findStore(params.id)) } }));
+  route("GET", "/api/stores/:id/endpoints", async ({ params }) => ({ body: { endpoints: E.listEndpoints(await findStore(params.id)) } }));
 
-  route("PUT", "/api/stores/:id/endpoints/:key", ({ params, body }) => {
-    const s = findStore(params.id);
+  route("PUT", "/api/stores/:id/endpoints/:key", async ({ params, body }) => {
+    const s = await findStore(params.id);
     const d = E.def(params.key);
     if (!d) throw new HttpError(404, "unknown_endpoint", "Unknown endpoint.");
     const method = String(body.method || d.method).toUpperCase();
@@ -398,17 +411,17 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     if (!p.startsWith("/") || p.includes("://") || p.length > 300) throw new HttpError(422, "path", "The path must start with / and be a path on the store, not a full address.");
     s.endpoints = s.endpoints || {};
     s.endpoints[params.key] = { ...(s.endpoints[params.key] || {}), method, path: p, added: true };
-    db.put(s);
+    await db.put(s);
     return { body: E.configOf(s, params.key) };
   });
 
   route("POST", "/api/stores/:id/endpoints/:key/check", async ({ params, body }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const zone = body.zone != null && body.zone !== "" ? { name: s.delivery.context_param, value: String(body.zone) } : null;
     const result = await E.checkEndpoint(ctx, s, params.key, {
       id: body.id, query: body.query, phone: body.phone, number: body.number, context: zone,
     });
-    db.put(s);
+    await db.put(s);
     return { body: result };
   });
 
@@ -420,8 +433,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     return r;
   };
 
-  route("POST", "/api/stores/:id/mapping/propose", ({ params, body }) => {
-    const s = findStore(params.id);
+  route("POST", "/api/stores/:id/mapping/propose", async ({ params, body }) => {
+    const s = await findStore(params.id);
     const resource = resourceOf(body);
     const sample = M.sampleFor(s, resource);
     if (!sample) throw new HttpError(409, "no_sample", "Check Product list first, so there is a sample to match against.");
@@ -429,8 +442,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     return { body: { ...proposal, saved: M.isSaved(s, resource) } };
   });
 
-  route("GET", "/api/stores/:id/mapping", ({ params, query }) => {
-    const s = findStore(params.id);
+  route("GET", "/api/stores/:id/mapping", async ({ params, query }) => {
+    const s = await findStore(params.id);
     const resource = resourceOf(query);
     const m = s.mapping?.[resource];
     return {
@@ -447,25 +460,25 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     };
   });
 
-  route("PUT", "/api/stores/:id/mapping", ({ params, body }) => {
-    const s = findStore(params.id);
+  route("PUT", "/api/stores/:id/mapping", async ({ params, body }) => {
+    const s = await findStore(params.id);
     const resource = resourceOf(body);
     const { rows, extras } = M.normaliseRows(s, resource, body.rows, body.extras);
     const version = M.saveVersion(s, resource, rows, extras);
-    db.put(s);
+    await db.put(s);
     return { body: { resource, version, rows, extras } };
   });
 
-  route("POST", "/api/stores/:id/mapping/rollback", ({ params, body }) => {
-    const s = findStore(params.id);
+  route("POST", "/api/stores/:id/mapping/rollback", async ({ params, body }) => {
+    const s = await findStore(params.id);
     const resource = resourceOf(body);
     const version = M.rollback(s, resource);
-    db.put(s);
+    await db.put(s);
     return { body: { resource, version } };
   });
 
-  route("GET", "/api/stores/:id/fields", ({ params, query }) => {
-    const s = findStore(params.id);
+  route("GET", "/api/stores/:id/fields", async ({ params, query }) => {
+    const s = await findStore(params.id);
     const resource = resourceOf(query);
     return { body: { resource, fields: M.fieldOptions(s, resource, query.compatible_with) } };
   });
@@ -473,7 +486,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   // ---- zones and delivery ----
 
   route("GET", "/api/stores/:id/zones", async ({ params }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     if (CHATTRN_LIKE.includes(s.connection_type)) {
       const r = await CC.listLocations(ctx, s);
       if (r.res.error || r.res.http !== 200) throw new HttpError(502, "store_error", "Could not read locations from the store.");
@@ -483,14 +496,14 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
         min_order: l.x_chattrn ? l.x_chattrn.min_order : null,
       }));
       s.samples = { ...(s.samples || {}), zone: r.list.slice(0, 5) };
-      db.put(s);
+      await db.put(s);
       return { body: { zones, count: zones.length, mapped: true, context_param: null, chosen: s.delivery.zone_value ?? null } };
     }
     const r = await E.getJudged(ctx, s, "zones", {}, null);
     if (r.bad) throw new HttpError(502, "store_error", r.bad.message);
     const list = (M.extractList(r.body) || []).filter(M.isObj);
     s.samples = { ...(s.samples || {}), zone: list.slice(0, 5) };
-    db.put(s);
+    await db.put(s);
     const zones = M.zonesOf(s, list);
     return {
       body: {
@@ -503,8 +516,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
     };
   });
 
-  route("PUT", "/api/stores/:id/delivery-settings", ({ params, body }) => {
-    const s = findStore(params.id);
+  route("PUT", "/api/stores/:id/delivery-settings", async ({ params, body }) => {
+    const s = await findStore(params.id);
     const mode = body.mode || s.delivery.mode;
     if (!DELIVERY_MODES.includes(mode)) throw new HttpError(422, "delivery_mode", "Mode must be zone or outlet.");
     const ask = body.ask_area_when || s.delivery.ask_area_when;
@@ -523,22 +536,22 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
       ask_area_when: ask,
       remember_area: body.remember_area === undefined ? s.delivery.remember_area : !!body.remember_area,
     };
-    db.put(s);
+    await db.put(s);
     return { body: s.delivery };
   });
 
   // ---- test runs and products ----
 
   route("POST", "/api/stores/:id/catalog/sync", async ({ params }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const result = await syncCatalog(ctx, s, { deadline: Date.now() + 55000 });
-    if (result.ok) db.put(s);
+    if (result.ok) await db.put(s);
     return { body: result };
   });
 
   // Products a customer in one zone can be offered (from the last sync). Without ?zone, every synced product.
-  route("GET", "/api/stores/:id/catalog", ({ params, query }) => {
-    const s = findStore(params.id);
+  route("GET", "/api/stores/:id/catalog", async ({ params, query }) => {
+    const s = await findStore(params.id);
     if (!s.catalog) throw new HttpError(409, "not_synced", "Sync the catalog first: POST /api/stores/:id/catalog/sync.");
     const zone = query.zone != null && query.zone !== "" ? String(query.zone) : null;
     const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
@@ -547,23 +560,23 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   });
 
   route("POST", "/api/stores/:id/location/discover", async ({ params }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const result = await discoverZoneParam(ctx, s);
-    db.put(s);
+    await db.put(s);
     return { body: { ...result, context_param: s.delivery.context_param, param_confirmed: !!s.delivery.param_confirmed } };
   });
 
   route("POST", "/api/stores/:id/test-runs", async ({ params, body }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     const run = CHATTRN_LIKE.includes(s.connection_type)
       ? await runChattrnTests(ctx, s, {})
       : await runTests(ctx, s, { phone: body.phone || null, zone: body.zone ?? null, rediscover: !!body.rediscover });
-    db.put(s);
+    await db.put(s);
     return { body: run };
   });
 
-  route("GET", "/api/stores/:id/test-runs/latest", ({ params }) => {
-    const s = findStore(params.id);
+  route("GET", "/api/stores/:id/test-runs/latest", async ({ params }) => {
+    const s = await findStore(params.id);
     const run = (s.test_runs || [])[0];
     if (!run) throw new HttpError(404, "no_runs", "No test has been run for this store yet.");
     return { body: run };
@@ -571,18 +584,26 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
 
   // Orders for a test phone, in Chattrn's order model. Customer fields are not returned.
   route("GET", "/api/stores/:id/orders", async ({ params, query }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
     if (!query.phone) throw new HttpError(400, "phone_required", "Enter a phone to look up orders. It isn't stored.");
     const r = await E.getJudged(ctx, s, "orders", { phone: query.phone }, null);
     if (r.bad) throw new HttpError(502, "store_error", r.bad.message);
     const list = (M.extractList(r.body) || []).filter(M.isObj);
     s.samples = { ...(s.samples || {}), orders: list.slice(0, 20).map(M.redact) };
-    db.put(s);
+    await db.put(s);
     return { body: { count: list.length, orders: list.map((raw) => M.toOrder(s, raw)) } };
   });
 
   route("GET", "/api/stores/:id/products", async ({ params, query }) => {
-    const s = findStore(params.id);
+    const s = await findStore(params.id);
+    if (CHATTRN_LIKE.includes(s.connection_type)) {
+      const result = query.query
+        ? await CC.searchProducts(ctx, s, query.query)
+        : await CC.listProducts(ctx, s, { page_info: query.page || 1, limit: 50 });
+      if (result.res.error || result.res.http !== 200) throw new HttpError(502, "store_error", `Could not load product previews (HTTP ${result.res.http ?? "unavailable"}).`);
+      const products = result.list.map((raw) => CC.toProduct(raw, s.currency));
+      return { body: { source: query.query ? "search" : "list", count: products.length, products } };
+    }
     const zone = query.zone != null && query.zone !== "" ? { name: s.delivery.context_param, value: String(query.zone) } : null;
     const useSearch = !!query.query && !!s.endpoints?.search;
     const host = new URL(s.base_url).host;
@@ -632,6 +653,42 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     try {
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.setHeader("X-Frame-Options", "DENY");
+      if (req.method === "GET" && url.pathname === "/auth/session") {
+        return sendJson(res, 200, { required: auth.configured, authenticated: !auth.configured || auth.sessionValid(req) });
+      }
+      if (req.method === "POST" && ["/auth/login", "/auth/logout"].includes(url.pathname)) {
+        if (!auth.sameOrigin(req) || req.headers["x-chattrn-request"] !== "dashboard" || !(req.headers["content-type"] || "").startsWith("application/json")) {
+          return sendJson(res, 403, { error: { message: "Use the sign-in form on this dashboard." } });
+        }
+        if (url.pathname === "/auth/logout") {
+          res.setHeader("Set-Cookie", auth.clear());
+          return sendJson(res, 200, { ok: true });
+        }
+        if (Date.now() - loginWindow > 60000) { loginWindow = Date.now(); loginFailures = 0; }
+        if (loginFailures >= 20) {
+          res.setHeader("Retry-After", "60");
+          return sendJson(res, 429, { error: { message: "Too many attempts. Try again in one minute." } });
+        }
+        const body = await readBody(req);
+        if (!auth.passwordValid(body.token)) {
+          loginFailures++;
+          return sendJson(res, 401, { error: { message: "The admin token is incorrect." } });
+        }
+        res.setHeader("Set-Cookie", auth.issue());
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === "GET" && url.pathname === "/health") {
+        try {
+          if (db.ping) await db.ping();
+          return sendJson(res, 200, { ok: true, storage: db.ping ? "postgres" : "json" });
+        } catch {
+          return sendJson(res, 503, { ok: false, error: "storage_unavailable" });
+        }
+      }
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/flow-tester")) {
         return serveFile(res, path.join(publicDir, "flow-tester.html"), "text/html; charset=utf-8");
       }
@@ -645,8 +702,11 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
         res.writeHead(404, { "Content-Type": "text/plain" });
         return res.end("Not found");
       }
-      if (adminToken && !isPackageCallback && req.headers["x-admin-token"] !== adminToken) {
-        return sendJson(res, 401, { error: { code: "unauthorized", message: "Missing or wrong admin token." } });
+      if (auth.configured && !isPackageCallback && !auth.headerValid(req)) {
+        if (!auth.sessionValid(req)) return sendJson(res, 401, { error: { code: "unauthorized", message: "Sign in to the dashboard." } });
+        if (!["GET", "HEAD"].includes(req.method) && (!auth.sameOrigin(req) || req.headers["x-chattrn-request"] !== "dashboard")) {
+          return sendJson(res, 403, { error: { code: "forbidden", message: "Use the dashboard to make this change." } });
+        }
       }
       for (const r of routes) {
         if (r.method !== req.method) continue;
@@ -669,15 +729,48 @@ function createApp({ dataDir, publicDir, adminToken, secretKey }) {
   return { server, ctx, db };
 }
 
+async function createConfiguredApp(options) {
+  if (process.env.RENDER && !options.adminToken) throw new Error("Render deployment requires ADMIN_TOKEN.");
+  const connectionString = options.databaseUrl || process.env.DATABASE_URL;
+  if (!connectionString) return createApp(options);
+  if (!process.env.CHATTRN_SECRET || process.env.CHATTRN_SECRET.length < 16) {
+    throw new Error("PostgreSQL storage requires CHATTRN_SECRET with at least 16 characters.");
+  }
+  const { PostgresDb } = require("./postgres-db");
+  const database = new PostgresDb(connectionString);
+  try {
+    await database.init();
+    return createApp({ ...options, database });
+  } catch (error) {
+    await database.close();
+    throw error;
+  }
+}
+
 if (require.main === module) {
   const root = path.join(__dirname, "..");
   const port = Number(process.env.PORT || 3100);
-  const { server } = createApp({
+  createConfiguredApp({
     dataDir: process.env.DATA_DIR || path.join(root, "data"),
     publicDir: path.join(root, "public"),
     adminToken: process.env.ADMIN_TOKEN || null,
+  }).then(({ server, db }) => {
+    server.listen(port, "0.0.0.0", () => console.log(`Chattrn connector backend listening on port ${port}`));
+    const stop = () => {
+      const force = setTimeout(() => process.exit(1), 25000);
+      force.unref();
+      server.close(async () => {
+        if (db.close) await db.close();
+        clearTimeout(force);
+        process.exit(0);
+      });
+    };
+    process.once("SIGTERM", stop);
+    process.once("SIGINT", stop);
+  }).catch(() => {
+    console.error("Startup failed. Check DATABASE_URL, database permissions, and CHATTRN_SECRET. The app did not fall back to local storage.");
+    process.exitCode = 1;
   });
-  server.listen(port, () => console.log(`Chattrn connector backend on http://localhost:${port}`));
 }
 
-module.exports = { createApp };
+module.exports = { createApp, createConfiguredApp };

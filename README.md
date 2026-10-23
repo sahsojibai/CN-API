@@ -23,6 +23,59 @@ Requires Node 22 or later. No dependencies.
 | `ADMIN_TOKEN` | If set, every `/api` call needs the header `X-Admin-Token` |
 | `ALLOW_PRIVATE_HOSTS=1` | **Tests and the local mock only.** Allows private IPs and plain HTTP. Never set in production |
 
+## Dashboard sign-in
+
+Set `ADMIN_TOKEN` to a long, random secret in the hosting environment. Render startup refuses
+to run without it. Open the dashboard and sign in using that value. The browser receives a
+signed, HttpOnly, SameSite=Strict session cookie lasting one hour (Secure in production).
+The token is not embedded in HTML or stored in localStorage. Sign out clears the cookie;
+rotating ADMIN_TOKEN invalidates existing sessions. Cookie-authenticated writes require
+same-origin dashboard requests. Automated clients can continue using X-Admin-Token.
+
+The `/health` readiness endpoint and token-authenticated `/package/register` callback remain
+accessible without dashboard sign-in. Login failures are limited to 20 per minute per process.
+For this single-admin testing dashboard, everyone with ADMIN_TOKEN has full access; this is
+not a multi-user account or role system. Local development without ADMIN_TOKEN stays open.
+
+## Persistent storage on Render
+
+Set `DATABASE_URL` to a PostgreSQL connection string to store connections, encrypted API
+credentials, mappings, catalog snapshots, and test results in PostgreSQL. On startup the app
+creates its own `chattrn_stores` table and token-hash index, then starts listening. It does
+not require deployed shell access. Without `DATABASE_URL`, local development continues to
+use `data/stores.json`.
+
+When using PostgreSQL, set a stable `CHATTRN_SECRET` of at least 16 characters (a generated
+32+ character secret is recommended). Do not rotate it without re-encrypting existing
+credentials. Startup fails if the secret is missing, or database initialization fails;
+it never silently falls back to temporary JSON files. Database writes finish before API
+success responses are sent. Concurrent changes to the same store are rejected with 409
+rather than overwriting newer data.
+
+Use a database in the same Render workspace and region, then copy its **Internal Database
+URL** into the web service's `DATABASE_URL` environment variable. The app creates only its
+own namespaced table; it can use an existing PostgreSQL database for a test deployment
+without changing Laravel's tables. A separate database/user is preferable for isolation.
+An external PostgreSQL connection should use TLS with certificate verification (for example,
+a provider URL with `sslmode=verify-full`); never disable certificate verification.
+
+Set Render's health-check path to `/health`. It returns 200 only when the app can reach
+its storage; a database outage returns 503. No credentials are exposed by that endpoint.
+
+Existing JSON files are not automatically imported. A fresh PostgreSQL deployment starts
+with no connections; connect the store again in the live dashboard. Existing installations
+that must preserve JSON data need a deliberate import using the original encryption secret.
+
+To run the real PostgreSQL persistence test against a disposable database:
+
+```bash
+TEST_DATABASE_URL='postgresql://user:password@localhost/test_database' npm run test:postgres
+```
+
+It verifies restarts, token exchange and replay rejection, encryption, saved mappings and
+runs, concurrency protection, and outage behavior. Standard `npm test` skips the database
+integration test when `TEST_DATABASE_URL` is not set.
+
 ## Routes
 
 | Method | Path | What it does |

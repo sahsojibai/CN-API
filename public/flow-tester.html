@@ -343,7 +343,18 @@ details summary { margin-top: 4px; }
 </style>
 </head>
 <body>
-<div class="app">
+<section id="adminLogin" hidden style="max-width:440px;margin:12vh auto;padding:28px;background:white;border:1px solid #ddd;border-radius:16px">
+  <h1>Sign in to Chattrn</h1>
+  <p>Enter the ADMIN_TOKEN you saved in your Render environment settings.</p>
+  <form id="adminLoginForm">
+    <label for="adminPassword">Admin token</label>
+    <input id="adminPassword" type="password" autocomplete="current-password" required style="width:100%;margin:12px 0">
+    <button class="primary" type="submit" id="adminSignIn">Sign in</button>
+    <p id="adminLoginError" role="alert" style="color:#b42318"></p>
+  </form>
+</section>
+<button type="button" id="adminSignOut" class="plain" hidden style="position:fixed;right:20px;top:12px;z-index:20;background:white">Sign out</button>
+<div class="app" id="dashboardApp" hidden>
   <nav class="rail" aria-label="Primary">
     <div class="rail-group">
       <div class="rail-item" aria-hidden="true">◎</div>
@@ -451,7 +462,7 @@ details summary { margin-top: 4px; }
             </div>
             <div class="row-body">
               <div class="row-title">Laravel package</div>
-              <div class="row-desc">Your developer runs one install command.</div>
+              <div class="row-desc">Install once, then review detected fields here.</div>
             </div>
             <button type="button" class="btn-grey row-connect" id="chooseLaravel">Connect</button>
           </div>
@@ -575,37 +586,22 @@ details summary { margin-top: 4px; }
         <!-- Shown until the package registers: the merchant needs the token and commands. -->
         <div class="card" id="lInstallCard">
           <div class="card-head"><div><h3>Install the Chattrn package</h3><p>Have your developer run these in the Laravel app's root, in order.</p></div></div>
-          <div class="cmd-row">
-            <span class="num">1</span>
-            <div class="cmd-body">
-              <span class="cmd-title">Add the package</span>
-              <div class="cmd-line"><code>composer require chattrn/connector</code><button type="button" class="plain copy-cmd" data-copy="composer require chattrn/connector">Copy</button></div>
-            </div>
-          </div>
-          <div class="cmd-row">
-            <span class="num">2</span>
-            <div class="cmd-body">
-              <span class="cmd-title">Run the installer</span>
-              <div class="cmd-line"><code>php artisan chattrn:install</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:install">Copy</button></div>
-            </div>
-          </div>
-          <div class="cmd-row">
-            <span class="num">3</span>
-            <div class="cmd-body">
-              <span class="cmd-title">Connection token <span class="dim">(single-use, expires in 30 minutes)</span></span>
-              <span class="cmd-sub">Paste this as a line in the app's <code>.env</code> file. <strong>Keep it private.</strong></span>
-              <div class="cmd-line"><code id="lTokenLine">Generate a token to continue&hellip;</code><button type="button" class="plain copy-cmd" id="lCopyToken" data-copy="">Copy</button></div>
-              <div><button type="button" class="btn-grey" id="lGenToken">Generate token</button> <span class="hint" id="lTokenNote" style="margin:0"></span></div>
-            </div>
-          </div>
-          <div class="cmd-row">
-            <span class="num">4</span>
-            <div class="cmd-body">
-              <span class="cmd-title">Register</span>
-              <span class="cmd-sub">Exchanges the setup token for an ongoing access token. Mapping happens in the next step, in the browser.</span>
-              <div class="cmd-line"><code>php artisan chattrn:register</code><button type="button" class="plain copy-cmd" data-copy="php artisan chattrn:register">Copy</button></div>
-            </div>
-          </div>
+          <p class="hint">Install and deploy once, then review mappings here. No manual access-token copying is needed.</p>
+          <details open><summary>Developer with terminal access</summary>
+            <div class="cmd-line"><code>composer require chattrn/connector</code></div>
+            <p>Set <code>CHATTRN_TOKEN</code> below and <code>CHATTRN_BACKEND_URL</code> to your public Chattrn backend.</p>
+            <div class="cmd-line"><code>php artisan migrate --force &amp;&amp; php artisan chattrn:register</code></div>
+          </details>
+          <details><summary>Deploy-only hosting (Render Free and similar)</summary>
+            <p>Add the package to your repository. Set the setup token and public backend URL in your host's environment settings.</p>
+            <p>After migrations, your startup script should run <code>php artisan chattrn:register --no-interaction</code> when <code>CHATTRN_TOKEN</code> is set. Deploy once; the package saves its access token encrypted in your database.</p>
+          </details>
+          <p class="hint">Pairing requires a publicly reachable backend. A store hosted online cannot call a backend at localhost.</p>
+          <div class="cmd-row"><div class="cmd-body">
+            <span class="cmd-title">Setup token — generate when ready to deploy (expires in 30 minutes)</span>
+            <div class="cmd-line"><code id="lTokenLine">Generate a token to continue…</code><button type="button" class="plain copy-cmd" id="lCopyToken" data-copy="">Copy</button></div>
+            <div><button type="button" class="btn-grey" id="lGenToken">Generate token</button> <span class="hint" id="lTokenNote" style="margin:0"></span></div>
+          </div></div>
         </div>
 
         <!-- Figma "Connection" card: replaces the install card once registration succeeds. -->
@@ -1967,9 +1963,11 @@ details summary { margin-top: 4px; }
   async function backend(method, p, body) {
     var res = await fetch(p, {
       method: method,
-      headers: body ? { "Content-Type": "application/json" } : {},
+      credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json", "X-Chattrn-Request": "dashboard" } : {},
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401) showAdminLogin("Your session expired. Sign in again.");
     var json = await res.json().catch(function () { return {}; });
     return { http: res.status, body: json };
   }
@@ -2631,7 +2629,7 @@ details summary { margin-top: 4px; }
 
   function checkRowHtml(c) {
     var cls = c.state === "passed" || c.state === "pass" ? "b-pass" : c.state === "failed" || c.state === "error" ? "b-fail" : c.state === "needs_attention" || c.state === "warning" ? "b-warn" : "b-skip";
-    var label = c.state === "passed" ? "Passed" : c.state === "pass" ? "Pass" : c.state === "failed" ? "Failed" : c.state === "needs_attention" ? "Needs attention" : c.state === "warning" ? "Warning" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : c.state;
+    var label = c.state === "passed" ? "Passed" : c.state === "pass" ? "Pass" : c.state === "failed" ? "Failed" : c.state === "needs_attention" ? "Needs attention" : c.state === "warning" ? "Warning" : c.state === "capability_only" ? "Advertised only" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : c.state;
     return '<div class="check-row"><span class="label">' + esc(c.label) + '</span><span class="msg">' + esc(c.message || "") + '</span><span class="badge ' + cls + '">' + esc(label) + '</span></div>';
   }
 
@@ -2958,7 +2956,7 @@ details summary { margin-top: 4px; }
     return '<div class="lmrow' + (row.status === "missing" ? " warn" : "") + '">' +
       '<div class="lmlabel"><span class="t">' + esc(row.title) + "</span>" +
         (row.hint ? '<span class="h">' + esc(row.hint) + "</span>" : "") + "</div>" +
-      '<div class="lmfield">' + (row.tag ? '<span class="mtag">' + esc(row.tag) + "</span>" : "") + field + "</div>" +
+      '<div class="lmfield">' + (row.tag ? '<span class="mtag">' + esc(row.tag) + "</span>" : "") + field + (row.sample != null ? '<span class="hint" style="display:block">Example: ' + esc(row.sample) + "</span>" : "") + "</div>" +
       '<div class="lmstatus"><span class="s ' + statusClass + '">' + statusText + "</span>" +
         (row.detail ? '<span class="d">' + esc(row.detail) + "</span>" : "") + "</div>" +
       "</div>";
@@ -2970,10 +2968,16 @@ details summary { margin-top: 4px; }
     var out = "";
     for (var i = 0; i < rows.length; i += 2) {
       out += '<div class="row2">' + rows.slice(i, i + 2).map(function (r) {
-        var f = '<input type="text" data-lmkey="' + esc(r.key) + '" value="' + esc(r.value || "") + '">';
+        var f = r.type === "select"
+          ? '<select data-lmkey="' + esc(r.key) + '">' + (r.options || []).map(function (o) {
+              var v = typeof o === "string" ? o : o.value;
+              var label = typeof o === "string" ? o : (o.label || o.value);
+              return '<option value="' + esc(v) + '"' + (v === (r.value || "") ? " selected" : "") + '>' + esc(label) + '</option>';
+            }).join("") + '</select>'
+          : '<input type="text" data-lmkey="' + esc(r.key) + '" value="' + esc(r.value || "") + '">';
         return '<div class="field"><label>' + esc(r.title) +
           (r.hint ? ' <span class="hint" style="margin:0">' + esc(r.hint) + "</span>" : "") +
-          "</label>" + f + "</div>";
+          "</label>" + f + (r.sample != null ? '<span class="hint">Example: ' + esc(r.sample) + "</span>" : "") + "</div>";
       }).join("") + "</div>";
     }
     return out;
@@ -2981,7 +2985,7 @@ details summary { margin-top: 4px; }
 
   function lmCardHtml(card) {
     var grid = card.layout === "grid";
-    return '<div class="card">' +
+    return (card.optional ? '<details class="card"><summary>' + esc(card.title) + ' — optional settings</summary>' : '<div class="card">') +
       '<div class="card-head"><div><div class="sec-title">' + esc(card.title) + "</div>" +
         (card.hint ? '<p class="hint" style="margin-top:4px">' + esc(card.hint) + "</p>" : "") + "</div>" +
         (card.action ? '<button type="button" class="plain" id="lRescan">' + esc(card.action) + "</button>" : "") +
@@ -2991,10 +2995,11 @@ details summary { margin-top: 4px; }
         return (g.label ? '<p class="lmcat">' + esc(g.label) + "</p>" : "") + (g.rows || []).map(lmRowHtml).join("");
       }).join("") +
       (card.note ? '<p class="lcard-note">' + esc(card.note) + "</p>" : "") +
-      "</div>";
+      (card.optional ? "</details>" : "</div>");
   }
 
   async function loadLaravelTables() {
+    $("lNext").disabled = true;
     $("lMapPanel").innerHTML = '<p class="hint">Reading your app’s tables…</p>';
     try {
       var id = await ensureLaravelStore();
@@ -3003,12 +3008,63 @@ details summary { margin-top: 4px; }
       lState.mapCards = res.body.cards || [];
       if (!lState.mapCards.length) { $("lMapPanel").innerHTML = '<p class="hint">The package did not return any tables to map.</p>'; return; }
       $("lMapPanel").innerHTML = lState.mapCards.map(lmCardHtml).join("");
+      $("lNext").disabled = false;
       var rescan = $("lRescan");
-      if (rescan) rescan.addEventListener("click", loadLaravelTables);
+      if (rescan) rescan.addEventListener("click", refreshLaravelDraft);
     } catch (e) {
-      $("lMapPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not read your tables: ' + esc(e.message) + "</p>";
+      $("lMapPanel").innerHTML = '<p class="hint" style="color:var(--fail)">Could not read your tables: ' + esc(e.message) + '</p><p class="hint">If your host is waking up, retry in a moment. Saved mappings have not changed.</p><button type="button" class="btn-grey" id="lRetryMapping">Retry loading tables</button>';
+      $("lRetryMapping").addEventListener("click", loadLaravelTables);
     }
   }
+
+  var lPreviewRevision = 0;
+  function laravelDraftValues() {
+    var values = {};
+    document.querySelectorAll("#lMapPanel [data-lmkey]").forEach(function (el) {
+      values[el.getAttribute("data-lmkey")] = el.value === "" ? null : el.value;
+    });
+    return values;
+  }
+
+  async function refreshLaravelDraft() {
+    var revision = ++lPreviewRevision;
+    var values = laravelDraftValues();
+    var save = $("lNext");
+    save.disabled = true;
+    var status = $("lDraftStatus");
+    if (!status) {
+      status = document.createElement("p");
+      status.id = "lDraftStatus";
+      status.className = "hint";
+      status.setAttribute("role", "status");
+      $("lMapPanel").prepend(status);
+    }
+    status.textContent = "Refreshing columns and examples. Changes are not saved yet…";
+    try {
+      var id = await ensureLaravelStore();
+      var res = await backend("POST", "/api/stores/" + id + "/laravel/mapping/preview", { values: values });
+      if (revision !== lPreviewRevision) return;
+      if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || "Could not refresh mappings.");
+      var current = laravelDraftValues();
+      var openSections = Array.from(document.querySelectorAll("#lMapPanel details[open] summary")).map(function (el) { return el.textContent; });
+      lState.mapCards = res.body.cards || [];
+      $("lMapPanel").innerHTML = '<p class="hint" role="status">Preview updated. Changes are not saved yet.</p>' + lState.mapCards.map(lmCardHtml).join("");
+      document.querySelectorAll("#lMapPanel [data-lmkey]").forEach(function (el) {
+        var value = current[el.getAttribute("data-lmkey")] || "";
+        if (current[el.getAttribute("data-lmkey")] !== values[el.getAttribute("data-lmkey")] && (el.tagName !== "SELECT" || Array.from(el.options).some(function (o) { return o.value === value; }))) el.value = value;
+      });
+      document.querySelectorAll("#lMapPanel details").forEach(function (el) { el.open = openSections.includes(el.querySelector("summary").textContent); });
+      if ($("lRescan")) $("lRescan").addEventListener("click", refreshLaravelDraft);
+    } catch (e) {
+      if (revision === lPreviewRevision) status.textContent = e.message + " Your saved mappings were not changed.";
+    } finally {
+      if (revision === lPreviewRevision) save.disabled = false;
+    }
+  }
+  $("lMapPanel").addEventListener("change", function (event) {
+    var key = event.target.getAttribute("data-lmkey") || "";
+    if (event.target.tagName === "SELECT" && key) refreshLaravelDraft();
+  });
 
   async function saveLaravelMapping() {
     var values = {};
@@ -3017,7 +3073,26 @@ details summary { margin-top: 4px; }
     });
     var id = await ensureLaravelStore();
     var res = await backend("PUT", "/api/stores/" + id + "/laravel/mapping", { values: values });
-    if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+    document.querySelectorAll("#lMapPanel .mapping-error").forEach(function (el) { el.remove(); });
+    document.querySelectorAll("#lMapPanel [aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
+    if (res.http !== 200 && res.http !== 201) {
+      var first = null;
+      document.querySelectorAll("#lMapPanel [data-lmkey]").forEach(function (el) {
+        var messages = res.body.errors && res.body.errors[el.getAttribute("data-lmkey")];
+        if (!messages) return;
+        el.setAttribute("aria-invalid", "true");
+        var note = document.createElement("p");
+        note.className = "mapping-error hint";
+        note.style.color = "var(--fail)";
+        note.textContent = messages.join(" ");
+        el.parentNode.appendChild(note);
+        var details = el.closest("details");
+        if (details) details.open = true;
+        if (!first) first = el;
+      });
+      if (first) first.focus();
+      throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+    }
     return res.body;
   }
 
@@ -3031,7 +3106,7 @@ details summary { margin-top: 4px; }
     var badge = st === "pass" ? '<span class="badge b-pass">Passed</span>'
       : st === "warn" ? '<span class="badge b-warn">Needs attention</span>'
       : st === "fail" ? '<span class="badge b-fail">Failed</span>'
-      : '<span class="badge b-skip">Not configured</span>';
+      : '<span class="badge b-skip">' + (c.state === "capability_only" ? "Advertised only" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : "Not configured") + '</span>';
     return '<div class="crow"><span class="ico ico-' + st + '">' + icon + '</span><div class="crow-body">' +
       '<span class="crow-title">' + esc(c.label) + "</span>" +
       '<span class="hint" style="margin:0">' + esc(c.message || "") + "</span></div>" +
@@ -3045,11 +3120,12 @@ details summary { margin-top: 4px; }
       var price = v.price != null ? v.price : p.price;
       var was = v.compare_at_price != null ? v.compare_at_price : null;
       var count = (p.variants || []).length;
-      var img = (p.images && p.images[0] && p.images[0].src) || p.image_url || null;
+      var firstImage = p.images && p.images[0];
+      var img = (typeof firstImage === "string" ? firstImage : firstImage && firstImage.src) || p.image_url || null;
       var qty = (p.variants || []).reduce(function (a, x) {
-        return a + (typeof x.inventory_quantity === "number" ? x.inventory_quantity : 0);
+        return a + (typeof x.inventory_quantity === "number" ? x.inventory_quantity : (typeof x.stock === "number" ? x.stock : 0));
       }, 0);
-      var hasQty = (p.variants || []).some(function (x) { return typeof x.inventory_quantity === "number"; });
+      var hasQty = (p.variants || []).some(function (x) { return typeof x.inventory_quantity === "number" || typeof x.stock === "number"; });
       var stock = !hasQty ? '<span class="badge b-skip">Unknown</span>'
         : qty > 0 ? '<span class="badge b-pass">In stock</span>'
         : '<span class="badge b-fail">Out of stock</span>';
@@ -3058,14 +3134,14 @@ details summary { margin-top: 4px; }
         '<span class="pname">' + esc(p.title || "Untitled") + "</span></div></td>" +
         '<td><span class="pprice">' + esc(price == null ? "—" : String(price)) + "</span>" +
           (was ? '<span class="was">' + esc(String(was)) + "</span>" : "") + "</td>" +
-        "<td>" + (count > 1 ? esc(count + " variants") : "None") + "</td>" +
+        "<td>" + (count > 0 ? esc(count + (count === 1 ? " variant" : " variants")) : "None") + "</td>" +
         "<td>" + stock + "</td></tr>";
     }).join("");
     var fieldsHtml = (fields && fields.length)
       ? '<div class="fields-wrap" style="margin-top:14px"><strong>Fields Chattrn understood</strong><div class="fields-list">' +
           fields.map(function (f) {
-            var cls = f.state === "missing" ? "b-warn" : "b-pass";
-            var mark = f.state === "missing" ? "! " : "&#10003; ";
+            var cls = f.state === "missing" || f.state === "check_this" ? "b-warn" : f.state === "optional" ? "b-skip" : "b-pass";
+            var mark = f.state === "missing" || f.state === "check_this" ? "! " : f.state === "optional" ? "Optional: " : "&#10003; ";
             return '<span class="badge ' + cls + '">' + mark + esc(f.label) + "</span>";
           }).join("") + "</div></div>"
       : "";
@@ -3083,23 +3159,28 @@ details summary { margin-top: 4px; }
       var dq = run.data_quality || [];
       var passed = checks.filter(function (c) { return c.state === "passed" || c.state === "pass"; }).length;
       var attention = checks.filter(function (c) { return c.state === "needs_attention" || c.state === "warning" || c.state === "warn"; }).length;
+      var failed = checks.filter(function (c) { return c.state === "failed" || c.state === "error"; }).length;
+      var advertised = checks.filter(function (c) { return c.state === "capability_only"; }).length;
 
       var products = [];
+      var previewError = null;
       var fields = run.fields_understood || [];
       try {
         var pr = await backend("GET", "/api/stores/" + id + "/products");
+        if (pr.http !== 200) throw new Error((pr.body.error && pr.body.error.message) || "Could not load product previews.");
         products = (pr.body && (pr.body.products || pr.body.records || pr.body.items)) || [];
-      } catch (e) { /* sample table is best-effort */ }
+      } catch (e) { previewError = e.message; }
 
-      var banner = '<div class="banner ok">' +
+      var verificationPassed = run.can_continue === true;
+      var banner = '<div class="banner ' + (verificationPassed ? 'ok' : '') + '">' +
         '<span class="ico ico-pass big">&#10003;</span>' +
-        '<div class="banner-body"><strong>Connected — package registered and mapping saved</strong>' +
+        '<div class="banner-body"><strong>' + (verificationPassed ? 'Connection verified' : 'Paired — verification needs attention') + '</strong>' +
         '<span class="hint" style="margin:0">chattrn/connector v' + esc($("lPackageVer").value.replace(/^.*v/, "") || "?") + ' on your Laravel app</span></div>' +
         '<span class="hint" style="margin:0">Checked just now</span>' +
         '<button type="button" class="primary" id="lRerun" style="background:#1c8274">Run test again</button></div>';
 
       var testCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test results</div>' +
-        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + "</p></div>" +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (advertised ? " · " + advertised + " advertised only" : "") + "</p></div>" +
         checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + "</div>";
 
       var dqCard = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
@@ -3109,7 +3190,7 @@ details summary { margin-top: 4px; }
 
       var sampleCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Sample products from your mapping</div>' +
         '<p class="hint" style="margin-top:4px">Check these look right — this is how the AI Agent and the inbox will see your products.</p></div>' +
-        lSampleTableHtml(products, fields) + "</div>";
+        (previewError ? '<p class="hint" style="color:var(--fail)">' + esc(previewError) + "</p>" : lSampleTableHtml(products, fields)) + "</div>";
 
       $("lVerifyPanel").innerHTML = banner + testCard + dqCard + sampleCard;
       var rerun = $("lRerun");
@@ -3204,7 +3285,48 @@ details summary { margin-top: 4px; }
     lState.sniffed = true;
   }
 
-  init();
+  function showAdminLogin(message) {
+    stopLaravelPoll();
+    $("dashboardApp").hidden = true;
+    $("adminSignOut").hidden = true;
+    $("adminLogin").hidden = false;
+    $("adminLoginError").textContent = message || "";
+    $("adminPassword").focus();
+  }
+  async function checkAdminSession() {
+    try {
+      var res = await fetch("/auth/session", { credentials: "same-origin", cache: "no-store" });
+      if (!res.ok) throw new Error("Could not check your session. Refresh to try again.");
+      var session = await res.json();
+      if (!session.authenticated) { showAdminLogin(); return; }
+      $("adminLogin").hidden = true;
+      $("dashboardApp").hidden = false;
+      $("adminSignOut").hidden = !session.required;
+      init();
+    } catch (e) { showAdminLogin(e.message); }
+  }
+  $("adminLoginForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    $("adminSignIn").disabled = true;
+    try {
+      var token = $("adminPassword").value;
+      $("adminPassword").value = "";
+      var res = await fetch("/auth/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Chattrn-Request": "dashboard" }, body: JSON.stringify({ token: token }) });
+      token = null;
+      var body = await res.json();
+      if (!res.ok) throw new Error((body.error && body.error.message) || "Could not sign in.");
+      await checkAdminSession();
+    } catch (e) { showAdminLogin(e.message); }
+    finally { $("adminSignIn").disabled = false; }
+  });
+  $("adminSignOut").addEventListener("click", async function () {
+    try {
+      var res = await fetch("/auth/logout", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Chattrn-Request": "dashboard" }, body: "{}" });
+      if (!res.ok) throw new Error("Could not sign out. Try again.");
+      location.reload();
+    } catch (e) { alert(e.message); }
+  });
+  checkAdminSession();
 })();
 </script>
 </body>

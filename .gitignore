@@ -1,2 +1,7 @@
 data/
 chattrn-API/
+
+node_modules/
+.env
+.env.*
+!.env.example

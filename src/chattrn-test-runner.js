@@ -60,7 +60,7 @@ async function runChattrnTests(ctx, store, input = {}) {
     label: "Store profile", state: profileOk ? "passed" : "failed",
     message: profileOk
       ? `Valid schema; name "${s.name}", currency ${s.currency}, delivery mode ${s.delivery_mode}.${s.iana_timezone ? "" : " Optional: timezone not set."}`
-      : "GET /store.json didn't return a valid store profile.",
+      : `Store profile is invalid${s ? ": check " + [!s.name && "store name", !s.currency && "currency", !s.delivery_mode && "delivery mode"].filter(Boolean).join(", ") : ": HTTP " + sp.res.http}. Review store settings and rerun.`,
     blocking: true,
   });
   if (profileOk) { store.currency = s.currency; store.country_code = s.country_code || store.country_code; store.chattrn.capabilities = s.capabilities || {}; }
@@ -76,8 +76,8 @@ async function runChattrnTests(ctx, store, input = {}) {
     const valid = productList.filter((p) => p.id != null && p.title && Array.isArray(p.variants) && p.variants.length);
     const count = cnt.count;
     if (!count || !productList.length) checks.push({ label: "Catalog", state: "failed", message: "No products came back.", blocking: true });
-    else if (valid.length === productList.length) checks.push({ label: "Catalog", state: "passed", message: `${count} products. ${valid.length} of ${productList.length} sampled have variants and images.`, blocking: true });
-    else checks.push({ label: "Catalog", state: "needs_attention", message: `Some of the ${productList.length} sampled products fail the schema.`, blocking: true });
+    else if (valid.length === productList.length) checks.push({ label: "Catalog", state: "passed", message: `${count} products. ${valid.length} of ${productList.length} sampled have a title and variants.`, blocking: true });
+    else checks.push({ label: "Catalog", state: "needs_attention", message: `Some of the ${productList.length} sampled products are missing an ID, title, or variants. Review Product name and Variant model mappings.`, blocking: true });
   } else {
     checks.push({ label: "Catalog", state: "failed", message: "Store profile failed first.", blocking: true });
   }
@@ -170,7 +170,7 @@ async function runChattrnTests(ctx, store, input = {}) {
 
   // 8. Cancel order (capability only).
   checks.push(caps.orders_cancel === true
-    ? { label: "Cancel order", state: "passed", message: "Checked in the developer sandbox only." }
+    ? { label: "Cancel order", state: "capability_only", message: "Your API advertises cancellation. No live order was cancelled during this test." }
     : { label: "Cancel order", state: "not_supported", message: "Your API doesn't offer this. It won't appear in Actions." });
 
   // 9. Update order (always out of scope in v1).
@@ -223,10 +223,10 @@ async function runChattrnTests(ctx, store, input = {}) {
 
   const sampleProducts = pickSamples(sample);
   const fields = [
-    { label: "Title", chattrn: "product.title", state: "matched" },
-    { label: "Selling price", chattrn: "variant.price", state: "matched" },
+    { label: "Title", chattrn: "product.title", state: sample.length && sample.every((p) => p.title) ? "matched" : "missing" },
+    { label: "Selling price", chattrn: "variant.price", state: sample.length && sample.every((p) => p.price != null) ? "matched" : "missing" },
     { label: "Was price", chattrn: "variant.compare_at_price", state: sample.some((p) => p.compare_at_price) ? "matched" : "optional" },
-    { label: "Variants and options", chattrn: "product.variants", state: "matched" },
+    { label: "Variants and options", chattrn: "product.variants", state: sample.length && sample.every((p) => p.variants.length) ? "matched" : "missing" },
     { label: "Stock per variant", chattrn: "variant.inventory_quantity", state: sample.some((p) => p.stock == null) ? "check_this" : "matched" },
     { label: "Images", chattrn: "product.images", state: sample.some((p) => p.images.length) ? "matched" : "optional" },
     { label: "Brand", chattrn: "product.vendor", state: sample.some((p) => p.vendor) ? "matched" : "optional" },
@@ -246,7 +246,7 @@ async function runChattrnTests(ctx, store, input = {}) {
     fields_understood: fields,
     summary: {
       passed: count("passed"), needs_attention: count("needs_attention"), failed: count("failed"),
-      not_run: count("not_run"), not_added: count("not_added"), not_supported: count("not_supported"),
+      capability_only: count("capability_only"), not_run: count("not_run"), not_added: count("not_added"), not_supported: count("not_supported"),
     },
     stopped_by_time_limit: over(),
   };
