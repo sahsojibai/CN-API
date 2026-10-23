@@ -18,6 +18,7 @@ const CC = require("./chattrn-connector");
 const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
+const { ensurePackageReady } = require("./package-ready");
 
 const AUTH_MODES = ["none", "key", "bearer", "basic"];
 const DELIVERY_MODES = ["zone", "outlet"];
@@ -371,6 +372,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("GET", "/api/stores/:id/laravel/tables", async ({ params }) => {
     const s = await laravelStore(params.id);
     if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
+    await ensurePackageReady(ctx, s);
     const res = await CL.call(ctx, s, { path: "/mapping.json" });
     if (res.http !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not return a mapping (HTTP ${res.http}).`);
     return { body: res.json };
@@ -379,6 +381,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("POST", "/api/stores/:id/laravel/mapping/preview", async ({ params, body }) => {
     const s = await laravelStore(params.id);
     if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "Pair your store first.");
+    await ensurePackageReady(ctx, s);
     const result = await CL.call(ctx, s, { path: "/mapping/preview.json", method: "POST", body: { values: body.values || {} } });
     if (result.http === 404) throw new HttpError(409, "package_update_required", "Update the Laravel package to refresh column choices before saving.");
     if (!result.json || result.error) throw new HttpError(502, "preview_failed", "Could not preview mappings. Your saved mappings were not changed.");
@@ -388,9 +391,15 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("PUT", "/api/stores/:id/laravel/mapping", async ({ params, body }) => {
     const s = await laravelStore(params.id);
     if (!s.laravel.registered_at || !s.chattrn.base_url) throw new HttpError(409, "not_registered", "The package hasn't registered yet.");
+    await ensurePackageReady(ctx, s);
     const res = await CL.call(ctx, s, { path: "/mapping.json", method: "PUT", body: { values: (body && body.values) || {} } });
     if (res.http === 422 && res.json) return { status: 422, body: res.json };
-    if (res.http !== 200 || !res.json) throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http}).`);
+    if (res.http !== 200 || !res.json) {
+      if ([502, 503, 504].includes(res.http) || res.error === "timeout") {
+        throw new HttpError(503, "save_unconfirmed", "The store connection was interrupted. Save could not be confirmed; your draft is kept here. Wait a moment, then save again. Do not generate a new token.");
+      }
+      throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http || "unavailable"}).`);
+    }
     s.laravel.last_seen_at = new Date().toISOString();
     await db.put(s);
     return { body: res.json };

@@ -3228,7 +3228,7 @@ details summary { margin-top: 4px; }
       var btn = this;
       btn.disabled = true;
       $("lFinishNote").style.color = "";
-      $("lFinishNote").textContent = "Saving mapping…";
+      $("lFinishNote").textContent = "Connecting to your store and saving… Free hosting may take up to a minute to wake up.";
       try {
         await saveLaravelMapping();
         $("lFinishNote").textContent = "";

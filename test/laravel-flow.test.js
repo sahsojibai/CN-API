@@ -11,11 +11,16 @@ const { createApp } = require("../src/server");
 
 test("Laravel pairing before mapping, validation errors, and native product previews", async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "laravel-flow-"));
+  let failSaves = false;
+  let putAttempts = 0;
   const store = http.createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
+    if (req.url.endsWith("store.json")) return res.end(JSON.stringify({ store: { name: "Test" } }));
     if (req.url.endsWith("mapping/preview.json")) return res.end(JSON.stringify({ cards: [{ title: "Draft columns", groups: [] }] }));
     if (req.url.endsWith("mapping.json")) {
       if (req.method === "PUT") {
+        putAttempts++;
+        if (failSaves) { res.writeHead(502); return res.end(JSON.stringify({ error: "gateway" })); }
         res.writeHead(422);
         return res.end(JSON.stringify({ error: { code: "invalid_mapping", message: "Choose currency." }, errors: { "store.currency": ["Choose currency."] } }));
       }
@@ -49,6 +54,12 @@ test("Laravel pairing before mapping, validation errors, and native product prev
     const invalid = await api("PUT", `/api/stores/${id}/laravel/mapping`, { values: { "store.currency": null } });
     assert.equal(invalid.status, 422);
     assert.deepEqual(invalid.body.errors["store.currency"], ["Choose currency."]);
+    failSaves = true;
+    putAttempts = 0;
+    const interrupted = await api("PUT", `/api/stores/${id}/laravel/mapping`, { values: {} });
+    assert.equal(interrupted.status, 503);
+    assert.equal(interrupted.body.error.code, "save_unconfirmed");
+    assert.equal(putAttempts, 1, "an interrupted write must never be retried automatically");
     const preview = await api("GET", `/api/stores/${id}/products`);
     assert.equal(preview.status, 200);
     assert.equal(preview.body.products[0].title, "Phone");
