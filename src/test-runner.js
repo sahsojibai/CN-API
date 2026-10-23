@@ -125,14 +125,17 @@ async function runTests(ctx, store, input = {}) {
     }
     const p95 = percentile(timings, 0.95);
     const first5 = rows.slice(0, 5);
-    const noStock = first5.filter((x) => x.p.stock == null || x.p.price == null).length;
+    const missing = first5.filter((x) => x.p.stock == null || x.p.price == null).map(x => ({
+      id: String(x.id), title: x.p.title, missing: [x.p.price == null ? "price" : null, x.p.stock == null ? "stock" : null].filter(Boolean),
+    }));
+    const noStock = missing.length;
     let state = "passed";
     let message = `${first5.length} of ${first5.length} checked have a price and stock. p95 ${p95} ms.`;
     if (problems.length) { state = "failed"; message = problems[0]; }
     else if (rows.length !== ids.length) { state = "failed"; message = "Stock checks did not finish. Run verification again."; }
-    else if (noStock) { state = "needs_attention"; message = `${noStock} of ${first5.length} checked have no price or stock.`; }
+    else if (noStock) { state = "needs_attention"; message = `${noStock} of ${first5.length} checked have missing values: ${missing.map(x => `${x.title || x.id} (${x.id}): ${x.missing.join(" and ")}`).join("; ")}. Review the product-detail response and field mapping.`; }
     else if (p95 > P95_MS) { state = "needs_attention"; message = `Slow: p95 ${p95} ms. Aim for ${P95_MS} ms or less.`; }
-    checks.push({ label: "Live stock and price", state, message });
+    checks.push({ label: "Live stock and price", state, message, blocking: true, affected_products: missing });
   }
 
   // 5. Order lookup, by a test phone entered for this run only (never stored).
@@ -259,6 +262,13 @@ async function runTests(ctx, store, input = {}) {
     duration_ms: Date.now() - started,
     phone: mask(input.phone),
     can_continue: ["Store profile", "Catalog", "Live stock and price"].every(label => checks.some(c => c.label === label && c.state === "passed")) && dq.some(c => c.label === "All pages load" && c.state === "pass"),
+    activation_blockers: [
+      ...["Store profile", "Catalog", "Live stock and price"].filter(label => !checks.some(c => c.label === label && c.state === "passed")).map(label => {
+        const check = checks.find(c => c.label === label);
+        return {label, message: check?.message || "Required check did not run."};
+      }),
+      ...(!dq.some(c => c.label === "All pages load" && c.state === "pass") ? [{label:"All pages load",message:dq.find(c => c.label === "All pages load")?.message || "Pagination check did not finish."}] : []),
+    ],
     checks,
     data_quality: dq,
     sample_products: sampleProducts,

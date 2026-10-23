@@ -203,3 +203,10 @@ test("zone-dependent store: verification samples automatically without choosing 
     assert.ok(run.body.data_quality.find(c=>c.label==="Whole-store coverage"));
   } finally { s.close(); }
 });
+
+ test("bare product with a brand relation is not mistaken for a response envelope", () => {
+   const product={id:'rice',name:'Rice',sellPrice:100,totalStock:0,brand:{id:'brand-1',name:'Brand'}};
+   assert.equal(M.unwrapOne(product),product);
+   for (const key of ['product','data','item','result']) assert.equal(M.unwrapOne({[key]:product}),product);
+   assert.deepEqual(M.unwrapOne({brand:{id:'brand-1',name:'Brand'}}),product.brand);
+ });

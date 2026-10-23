@@ -1902,11 +1902,13 @@ details summary { margin-top: 4px; }
       var res = await backend("POST", "/api/stores/" + await ensureBackendStore() + "/test-runs", {});
       if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
       state.progress.verified = res.body.can_continue === true;
+      $("finishNote").textContent = state.progress.verified ? "Verification passed. You can continue to activation." :
+        "Activation is blocked: " + (res.body.activation_blockers || []).map(function (b) { return b.label + ": " + b.message; }).join(" ");
       $("testPanel").innerHTML = '<div class="card"><p class="hint">Verification uses automatic samples. Whole-store import includes every location and continues in the background.</p>' + res.body.checks.map(checkRowHtml).join("") +
         (res.body.data_quality || []).map(checkRowHtml).join("") + '<p id="mappedCatalogProgress" class="hint"></p><button type="button" id="runAgain">Run verification again</button></div>';
       if (state.progress.verified) watchCatalog(state.storeId, "mappedCatalogProgress");
       ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
-    } catch(e) { $("testPanel").textContent = e.message; }
+    } catch(e) { $("testPanel").textContent = e.message; $("finishNote").textContent = "Activation is blocked: verification did not finish. " + e.message; }
     finally { $("next").disabled = !state.progress.verified; }
   }
   // ---- Steps -------------------------------------------------------------

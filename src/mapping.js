@@ -476,6 +476,9 @@ function extractList(body, depth = 0) {
 
 function unwrapOne(body) {
   if (!isObj(body)) return body;
+  // A bare resource may contain related objects named brand, product or order.
+  // Its own identity and title distinguish it from a response envelope.
+  if (idOf(body) != null && titleOf(body) != null) return body;
   for (const k of ["product", "order", "brand", "data", "item", "result"]) if (isObj(body[k])) return body[k];
   const keys = Object.keys(body);
   if (keys.length === 1 && isObj(body[keys[0]])) return body[keys[0]];
