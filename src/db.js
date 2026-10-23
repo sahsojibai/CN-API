@@ -42,8 +42,9 @@ class Db {
 }
 
 function publicView(store) {
-  const { auth, chattrn, laravel, ...rest } = store;
+  const { auth, chattrn, laravel, onboarding_draft, ...rest } = store;
   const out = { ...rest };
+  if (onboarding_draft) out.onboarding_draft_saved_at = onboarding_draft.saved_at;
   if (auth) out.auth = { mode: auth.mode, header: auth.header || null, key_saved: !!auth.secret_enc };
   if (chattrn) out.chattrn = { base_url: chattrn.base_url, api_version: chattrn.api_version || null, capabilities: chattrn.capabilities || null, token_saved: !!chattrn.access_token_enc };
   // Never expose the one-time connection-token hash, or whether one is pending, beyond what the

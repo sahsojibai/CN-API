@@ -844,6 +844,7 @@ details summary { margin-top: 4px; }
   </div>
 </div>
 
+<script src="/onboarding-drafts.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1904,6 +1905,7 @@ details summary { margin-top: 4px; }
   var STEP_SUB = ["Endpoints and sign-in", "Suggested matches, you check", "Data and speed", "Where you deliver"];
   function showStep(n) {
     state.step = Math.max(1, Math.min(4, n));
+    queueDraftSave();
     document.querySelectorAll("[data-panel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-panel")) !== state.step;
     });
@@ -1989,6 +1991,7 @@ details summary { margin-top: 4px; }
       throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
     }
     state.storeId = res.body.id;
+    queueDraftSave();
     return state.storeId;
   }
 
@@ -2156,6 +2159,7 @@ details summary { margin-top: 4px; }
     $("connectChoiceView").hidden = false;
     $("siteCheckUrl").value = "";
     closeStoreMenu();
+    showDraftOffers();
   }
   function setBanner(text) {
     $("listBannerText").textContent = text || "";
@@ -2238,12 +2242,19 @@ details summary { margin-top: 4px; }
   $("backFromChoice").addEventListener("click", showList);
   $("chooseMappedApi").addEventListener("click", function () { resetBackendStore(); showWizard(); });
   $("chooseChattrnApi").addEventListener("click", function () { resetChattrnStore(); showChattrnWizard(); });
-  $("chooseLaravel").addEventListener("click", function () { resetLaravelStore(); showLaravelWizard(); });
-  $("siteCheckBtn").addEventListener("click", function () {
-    // Website-check probing is out of scope for this build (see devspec's "Website check" tool) —
-    // this just nudges toward the two supported connection paths below.
-    var u = $("siteCheckUrl").value.trim();
-    alert(u ? "Website check isn't wired up yet. Pick a connection option below for \"" + u + "\"." : "Enter a website address, or pick a connection option below.");
+  $("chooseLaravel").addEventListener("click", function () { resetLaravelStore(); if ($("siteCheckUrl").value.trim()) $("lSiteUrl").value = $("siteCheckUrl").value.trim(); showLaravelWizard(); });
+  $("siteCheckBtn").addEventListener("click", async function () {
+    var u = $("siteCheckUrl").value.trim(), button = this;
+    var result = $("siteDiscoveryResult");
+    if (!result) { result = document.createElement("p"); result.id = "siteDiscoveryResult"; result.className = "hint"; result.setAttribute("role", "status"); button.parentNode.appendChild(result); }
+    if (!u) { result.textContent = "Enter a website address first."; return; }
+    button.disabled = true; result.textContent = "Checking for the Chattrn package…";
+    try {
+      var response = await backend("POST", "/api/website-sniff", { website_url: u });
+      if (response.http !== 200) throw new Error(response.body.error?.message || "Website discovery failed.");
+      result.textContent = response.body.message + (response.body.package_status === "installed" ? " Choose Laravel package below to continue." : " Choose an option below, or retry the check.");
+    } catch (e) { result.textContent = e.message; }
+    finally { button.disabled = false; }
   });
 
   // Finish runs the connection check again. The store joins the list only when that check passes.
@@ -2259,6 +2270,7 @@ details summary { margin-top: 4px; }
         throw new Error(res.body.message || ("HTTP " + res.http));
       }
       $("finishNote").textContent = "";
+      await clearSetupDraft("mapped_api", id);
       showList();
       setBanner(($("storeName").value.trim() || "Store") + " is connected.");
     } catch (e) {
@@ -2544,6 +2556,7 @@ details summary { margin-top: 4px; }
 
   function cShowStep(n) {
     cState.step = Math.max(1, Math.min(3, n));
+    queueDraftSave();
     document.querySelectorAll("[data-cpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-cpanel")) !== cState.step;
     });
@@ -2586,6 +2599,7 @@ details summary { margin-top: 4px; }
       });
       if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
       cState.storeId = res.body.id;
+      queueDraftSave();
     }
     return cState.storeId;
   }
@@ -2681,6 +2695,7 @@ details summary { margin-top: 4px; }
       var result = await chattrnCheck();
       if (result.state !== "connected") throw new Error(result.message || "Could not connect.");
       $("cFinishNote").textContent = "";
+      await clearSetupDraft("chattrn_api", id);
       showList();
       setBanner(($("cStoreName").value.trim() || "Store") + " is connected.");
     } catch (e) {
@@ -2711,14 +2726,15 @@ details summary { margin-top: 4px; }
   var LSTEP_SUB = ["Composer and artisan commands", "Next", "Check it's live"];
   var LSTEP_DONE = ["Token exchanged", "Mapping saved", ""];
 
-  function resetLaravelStore() { lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
+  function resetLaravelStore() { $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
 
   function showLaravelWizard() {
     setCrumbStore("");
     hideAllViews();
     $("laravelWizardView").hidden = false;
     closeStoreMenu();
-    $("lTokenLine").textContent = "Generate a token to continue…";
+    $("lTokenLine").textContent = lState.pendingToken ? "A setup token is already pending. Keep the token configured on your host and wait for pairing; it is not stored in this browser draft." : "Generate a token to continue…";
+    $("lGenToken").textContent = lState.pendingToken ? "Replace setup token" : "Generate token";
     $("lCopyToken").setAttribute("data-copy", "");
     $("lTokenNote").textContent = "";
     lShowStep(1);
@@ -2732,6 +2748,7 @@ details summary { margin-top: 4px; }
 
   function lShowStep(n) {
     lState.step = Math.max(1, Math.min(3, n));
+    queueDraftSave();
     document.querySelectorAll("[data-lpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-lpanel")) !== lState.step;
     });
@@ -2781,6 +2798,7 @@ details summary { margin-top: 4px; }
       });
       if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
       lState.storeId = res.body.id;
+      queueDraftSave();
     }
     return lState.storeId;
   }
@@ -2806,6 +2824,7 @@ details summary { margin-top: 4px; }
   });
 
   async function lGenerateToken() {
+    if (lState.pendingToken && !window.confirm("Replace the pending setup token? The token already configured on your host will stop working. Continue only if you need a replacement.")) return;
     var btn = $("lGenToken");
     btn.disabled = true;
     $("lTokenNote").style.color = "";
@@ -2814,6 +2833,8 @@ details summary { margin-top: 4px; }
       var id = await ensureLaravelStore();
       var res = await backend("POST", "/api/stores/" + id + "/laravel/connection-token", {});
       if (res.http !== 200 && res.http !== 201) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      lState.pendingToken = true;
+      $("lGenToken").textContent = "Replace setup token";
       var line = "CHATTRN_TOKEN=" + res.body.token;
       $("lTokenLine").textContent = line;
       $("lCopyToken").setAttribute("data-copy", line);
@@ -2828,6 +2849,11 @@ details summary { margin-top: 4px; }
       btn.disabled = false;
     }
   }
+  var skipDiscovery = document.createElement("button");
+  skipDiscovery.id = "lSkipDiscovery"; skipDiscovery.type = "button"; skipDiscovery.className = "btn-grey";
+  skipDiscovery.textContent = "Continue without discovery"; skipDiscovery.hidden = true;
+  $("lGenToken").parentNode.appendChild(skipDiscovery);
+  skipDiscovery.addEventListener("click", function () { this.hidden = true; lState.sniffed = true; lGenerateToken(); });
   $("lGenToken").addEventListener("click", async function () {
     var site = $("lSiteUrl").value.trim();
     if (!site) { $("lDetailsErr").hidden = false; $("lDetailsErr").textContent = "Fill in: Website URL."; return; }
@@ -2840,6 +2866,17 @@ details summary { margin-top: 4px; }
       var res = await backend("POST", "/api/website-sniff", { website_url: site });
       lState.sniffed = true;
       $("lTokenNote").textContent = "";
+      if (res.http === 200) {
+        $("lTokenNote").textContent = res.body.message || "";
+        lState.discovery = res.body;
+        if (res.body.package_status === "unavailable") {
+          btn.disabled = false;
+          $("lTokenNote").textContent += " Click Generate token again to retry discovery, or use Continue without discovery below.";
+          lState.sniffed = false;
+          $("lSkipDiscovery").hidden = false;
+          return;
+        }
+      }
       if (res.http === 200 && res.body.checked && res.body.laravel_likely === false) {
         btn.disabled = false;
         showLaravelModal(res.body.framework);
@@ -3003,9 +3040,20 @@ details summary { margin-top: 4px; }
       var id = await ensureLaravelStore();
       var res = await backend("GET", "/api/stores/" + id + "/laravel/tables");
       if (res.http !== 200) throw new Error((res.body.error && res.body.error.message) || ("HTTP " + res.http));
+      if (lState.draftValues && Object.keys(lState.draftValues).length) {
+        var preview = await backend("POST", "/api/stores/" + id + "/laravel/mapping/preview", { values: lState.draftValues });
+        if (preview.http === 200) res = preview;
+      }
       lState.mapCards = res.body.cards || [];
       if (!lState.mapCards.length) { $("lMapPanel").innerHTML = '<p class="hint">The package did not return any tables to map.</p>'; return; }
       $("lMapPanel").innerHTML = lState.mapCards.map(lmCardHtml).join("");
+      document.querySelectorAll("#lMapPanel [data-lmkey]").forEach(function (el) {
+        var key = el.getAttribute("data-lmkey");
+        if (!lState.draftValues || !Object.prototype.hasOwnProperty.call(lState.draftValues, key)) return;
+        var value = lState.draftValues[key] || "";
+        if (el.tagName === "SELECT" && !Array.from(el.options).some(function (o) { return o.value === value; })) el.add(new Option(value + " (review)", value));
+        el.value = value;
+      });
       $("lNext").disabled = false;
       var rescan = $("lRescan");
       if (rescan) rescan.addEventListener("click", refreshLaravelDraft);
@@ -3260,6 +3308,7 @@ details summary { margin-top: 4px; }
       if (check.body.state !== "connected") throw new Error(check.body.message || "Could not connect.");
       $("lFinishNote").textContent = "";
       stopLaravelPoll();
+      await clearSetupDraft("laravel_package", id);
       showList();
       setBanner(($("lStoreName").value.trim() || "Store") + " is connected.");
     } catch (e) {
@@ -3280,7 +3329,130 @@ details summary { margin-top: 4px; }
     brand.value = s.brand || brand.options[0].value;
     $("lStoreType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
     lState.storeId = s.id;
+    lState.pendingToken = !!s.laravel?.token_pending;
     lState.sniffed = true;
+  }
+
+  // Persist only allowlisted configuration; never persist credentials or sampled commerce data.
+  var draftTimer = null, draftResuming = false, draftChain = Promise.resolve();
+  var draftViews = { mapped_api: "wizardView", chattrn_api: "chattrnWizardView", laravel_package: "laravelWizardView" };
+  var draftLabels = { mapped_api: "Existing API", chattrn_api: "Chattrn API", laravel_package: "Laravel package" };
+  var draftTray = document.createElement("div"); draftTray.className = "card"; draftTray.hidden = true;
+  $("connectChoiceView").prepend(draftTray);
+  function activeDraftKind() { return Object.keys(draftViews).find(function (k) { return !$(draftViews[k]).hidden; }); }
+  function draftStatus(kind, text) {
+    var view = $(draftViews[kind]);
+    var status = view.querySelector("[data-draft-status]");
+    if (!status) { status = document.createElement("p"); status.className = "hint"; status.setAttribute("data-draft-status", ""); status.setAttribute("role", "status"); view.prepend(status); }
+    status.textContent = text;
+  }
+  function captureDraft(kind) {
+    var current = kind === "mapped_api" ? state : kind === "chattrn_api" ? cState : lState;
+    var fields = {};
+    ChattrnDrafts.FIELDS[kind].forEach(function (key) { var el = $(key); if (el) fields[key] = el.type === "checkbox" ? el.checked : el.value; });
+    var values = kind === "laravel_package" && lState.step === 2 ? laravelDraftValues() : {};
+    if (kind === "laravel_package" && Object.keys(values).length) lState.draftValues = values;
+    return ChattrnDrafts.sanitize({ kind: kind, store_id: current.storeId, step: current.step, fields: fields,
+      mappings: kind === "mapped_api" ? state.map : {}, laravel_values: kind === "laravel_package" ? lState.draftValues || {} : {},
+      endpoints: kind === "mapped_api" ? ROWS.map(function (r) { return { id: r.id, path: r.path }; }) : [] });
+  }
+  function stashDraft(kind) {
+    var d = captureDraft(kind);
+    if (!Object.values(d.fields).some(function (v) { return typeof v === "string" && /^https?:/.test(v); }) && !d.store_id) return null;
+    try { var stored = ChattrnDrafts.save(localStorage, d); stored.browser_saved = true; return stored; }
+    catch (_) { d.saved_at = d.edited_at = new Date().toISOString(); d.browser_saved = false; return d; }
+  }
+  function queueDraftSave() {
+    if (draftResuming) return;
+    clearTimeout(draftTimer);
+    var kind = activeDraftKind(); if (!kind) return;
+    // Capture synchronously so navigating away before the debounce does not lose edits.
+    var d = stashDraft(kind); if (!d) return;
+    draftStatus(kind, d.store_id ? "Draft captured. Backing up setup…" : d.browser_saved
+      ? "Draft saved in this browser. Credentials are not saved; create the connection to enable server backup."
+      : "Browser storage is unavailable. Keep this page open until a connection can be created and backed up.");
+    if (!d.store_id) return;
+    draftTimer = setTimeout(function () {
+      draftChain = draftChain.catch(function () {}).then(async function () {
+        try {
+          var res = await backend("PUT", "/api/stores/" + d.store_id + "/onboarding-draft", d);
+          if (res.http !== 200) throw new Error("Draft backup failed");
+          draftStatus(kind, "Setup draft backed up. You can resume after refreshing or signing in again. Credentials are excluded.");
+        } catch (_) { draftStatus(kind, d.browser_saved ? "Server backup unavailable. Your draft is kept in this browser; retry by making another edit." : "Draft backup failed and browser storage is unavailable. Keep this page open and retry by editing a field."); }
+      });
+    }, 500);
+  }
+  document.addEventListener("input", queueDraftSave);
+  document.addEventListener("change", queueDraftSave);
+  window.addEventListener("pagehide", function () { var kind = activeDraftKind(); if (kind) stashDraft(kind); });
+  async function clearSetupDraft(kind, id) {
+    clearTimeout(draftTimer);
+    await draftChain.catch(function () {});
+    try { localStorage.removeItem("chattrn.draft.v1." + kind); } catch (_) {}
+    var res = await backend("DELETE", "/api/stores/" + id + "/onboarding-draft");
+    if (res.http !== 200) throw new Error("Connection saved, but draft cleanup failed. Retry finishing to clear the draft.");
+  }
+  async function resumeSetupDraft(d) {
+    draftResuming = true; clearTimeout(draftTimer);
+    try {
+      var connected = null;
+      if (d.store_id) {
+        var res = await backend("GET", "/api/stores/" + d.store_id);
+        if (res.http !== 200) throw new Error("Saved connection is unavailable. Sign in or start a new setup.");
+        connected = res.body;
+        if (connected.connection_type !== d.kind) throw new Error("Connection type has changed. Open its current settings instead.");
+      }
+      if (d.kind === "mapped_api") { if (connected) prefillWizard(connected); else resetBackendStore(); }
+      else if (d.kind === "chattrn_api") { if (connected) prefillChattrnWizard(connected); else resetChattrnStore(); }
+      else { if (connected) prefillLaravelWizard(connected); else resetLaravelStore(); }
+      Object.entries(d.fields).forEach(function ([key, value]) {
+        var el = $(key); if (!el) return;
+        if (el.type === "checkbox") el.checked = !!value;
+        else { if (el.tagName === "SELECT" && value && !Array.from(el.options).some(function (o) { return o.value === value; })) el.add(new Option(value, value)); el.value = value; }
+      });
+      // A fresh page must never reuse a token from another in-memory connection.
+      if (d.kind === "mapped_api") { $("key").value = ""; state.products = connected?.samples?.product || []; state.ctxName = d.fields.ctxName || ""; state.ctxValue = d.fields.ctxValue || ""; state.map = d.mappings; $("headerBox").hidden = $("auth").value !== "key"; $("keyBox").hidden = $("auth").value === "none"; state.suggested = { product: true, variant: true, zone: true }; d.endpoints.forEach(function (ep) { var row = ROWS.find(function (r) { return r.id === ep.id; }); if (row) row.path = ep.path; }); buildRows(); setMode($("storeType").value); showWizard(); if (d.step >= 2 && state.products.length) showStep(2); }
+      else if (d.kind === "chattrn_api") { $("cToken").value = ""; showChattrnWizard(); }
+      else { lState.draftValues = d.laravel_values; showLaravelWizard(); if (connected && connected.laravel?.registered_at && d.step >= 2) lShowStep(2); }
+      draftStatus(d.kind, "Draft restored. Stored server credentials remain hidden. Credentials used only for browser-based endpoint tests must be re-entered; they are excluded from drafts. Review settings before continuing.");
+    } finally { draftResuming = false; }
+  }
+  async function showDraftOffers() {
+    var drafts = [];
+    ChattrnDrafts.KINDS.forEach(function (kind) { try { var d = ChattrnDrafts.load(localStorage, kind); if (d) drafts.push(d); } catch (_) {} });
+    try {
+      var response = await backend("GET", "/api/stores");
+      if (response.http === 200) {
+        var candidates = (response.body.stores || []).filter(function (s) { return s.onboarding_draft_saved_at && Date.now() - Date.parse(s.onboarding_draft_saved_at) < ChattrnDrafts.TTL; }).sort(function (a, b) { return Date.parse(b.onboarding_draft_saved_at) - Date.parse(a.onboarding_draft_saved_at); }).slice(0, 10);
+        for (var item of candidates) {
+          var saved = await backend("GET", "/api/stores/" + item.id + "/onboarding-draft");
+          var remote = saved.body.draft;
+          if (!remote) continue;
+          var index = drafts.findIndex(function (d) { return d.store_id === item.id; });
+          if (index < 0) drafts.push(remote);
+          else if (Date.parse(remote.edited_at || remote.saved_at) > Date.parse(drafts[index].edited_at || drafts[index].saved_at)) drafts[index] = remote;
+        }
+      }
+    } catch (_) { /* A browser draft remains resumable while server backup is unavailable. */ }
+    draftTray.replaceChildren(); draftTray.hidden = !drafts.length;
+    if (!drafts.length) return;
+    var title = document.createElement("p"); title.textContent = "Resume a saved setup"; draftTray.appendChild(title);
+    drafts.forEach(function (d) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "btn-grey";
+      button.textContent = draftLabels[d.kind] + " — " + (d.fields.lStoreName || d.fields.cStoreName || d.fields.storeName || "Unnamed store");
+      button.addEventListener("click", async function () { button.disabled = true; try { await resumeSetupDraft(d); } catch (e) { draftStatus(d.kind, e.message); button.textContent = e.message; } finally { button.disabled = false; } });
+      draftTray.appendChild(button);
+      var discard = document.createElement("button"); discard.type = "button"; discard.className = "plain"; discard.textContent = "Discard draft";
+      discard.addEventListener("click", async function () {
+        discard.disabled = true;
+        try {
+          if (d.store_id) { var result = await backend("DELETE", "/api/stores/" + d.store_id + "/onboarding-draft"); if (result.http !== 200) throw new Error("Could not discard server draft."); }
+          try { var local = ChattrnDrafts.load(localStorage, d.kind); if (local && local.store_id === d.store_id) localStorage.removeItem("chattrn.draft.v1." + d.kind); } catch (_) {}
+          showDraftOffers();
+        } catch (e) { discard.textContent = e.message; discard.disabled = false; }
+      });
+      draftTray.appendChild(discard);
+    });
   }
 
   function showAdminLogin(message) {

@@ -1,39 +1,39 @@
 "use strict";
-// A single-request framework sniff, just enough to power the "Laravel not detected" modal
-// (devspec.txt: "0b and Modal: Laravel not detected"). This is deliberately NOT the full
-// "Website check" service (devspec.txt's multi-endpoint recommendation engine with evidence
-// rows, confidence, caching and rate limits) - that's a separate, larger piece and stays out
-// of scope. This just fetches the homepage once and looks for a handful of signals.
 const { request, assertPublicUrl } = require("./http");
-
-const FRAMEWORK_MARKERS = [
-  { name: "WordPress", test: (text) => /\/wp-content\/|\/wp-json\//i.test(text) },
-  { name: "Shopify", test: (text) => /cdn\.shopify\.com/i.test(text) },
-  { name: "Next.js", test: (text) => /\/_next\//i.test(text) },
-  { name: "Nuxt", test: (text) => /\/_nuxt\//i.test(text) },
+const MARKERS = [
+  ["WordPress", /\/wp-content\/|\/wp-json\//i], ["Shopify", /cdn\.shopify\.com/i],
+  ["Next.js", /\/_next\//i], ["Nuxt", /\/_nuxt\//i],
 ];
-
-function looksLikeLaravel(cookies) {
-  return cookies.some((c) => /laravel_session|XSRF-TOKEN/i.test(c));
-}
-
-// Returns { laravel_likely, framework } - framework is the best guess at what's running when
-// Laravel signals are absent, or null when nothing recognisable was found.
-async function sniffFramework(url) {
+async function sniffFramework(url, transport = request) {
   await assertPublicUrl(url);
-  const res = await request({ url, method: "GET", timeoutMs: 5000 });
-  // A network failure means we never got headers or a body to look at. An HTTP error status
-  // (404, 500, a login redirect...) still carries cookies and markup worth inspecting.
-  if (res.error || res.http == null) {
-    return { laravel_likely: null, framework: null, checked: false, message: res.message || "Could not reach that address." };
+  const discovery = new URL(url);
+  discovery.pathname = discovery.pathname.replace(/\/+$/, "") + "/.well-known/chattrn.json";
+  discovery.search = ""; discovery.hash = "";
+  const probe = await transport({ url: discovery.href, method: "GET", timeoutMs: 5000 });
+  const meta = probe.json;
+  if (probe.http === 200 && !probe.error && meta?.package === "chattrn/connector" && meta.framework === "Laravel" &&
+      typeof meta.api_path === "string" && /^\/(?!\/)[a-zA-Z0-9_/-]+$/.test(meta.api_path)) {
+    return { checked: true, laravel_likely: true, framework: "Laravel", package_status: "installed",
+      package_version: typeof meta.package_version === "string" ? meta.package_version.slice(0, 40) : null,
+      api_path: meta.api_path, message: "Chattrn package found. Continue with pairing." };
   }
-  const cookies = res.setCookie || [];
-  if (looksLikeLaravel(cookies)) {
-    return { laravel_likely: true, framework: "Laravel", checked: true };
+  if (probe.error || probe.http == null || [429, 502, 503, 504].includes(probe.http)) {
+    return { checked: false, laravel_likely: null, framework: null, package_status: "unavailable",
+      message: "The store may be waking up or temporarily unavailable. Retry discovery; this does not mean it is not Laravel." };
   }
-  const text = res.text || "";
-  const hit = FRAMEWORK_MARKERS.find((m) => m.test(text));
-  return { laravel_likely: false, framework: hit ? hit.name : null, checked: true };
+  const home = await transport({ url, method: "GET", timeoutMs: 5000 });
+  if (home.error || home.http == null || home.http >= 500 || home.http === 429) {
+    return { checked: false, laravel_likely: null, framework: null, package_status: "unavailable",
+      message: "Could not identify the store while it is unavailable. Retry shortly or continue if you know it uses Laravel." };
+  }
+  const laravel = (home.setCookie || []).some(c => /laravel_session|XSRF-TOKEN/i.test(c));
+  const marker = MARKERS.find(([, pattern]) => pattern.test(home.text || ""));
+  return { checked: true, laravel_likely: laravel ? true : marker ? false : null,
+    framework: laravel ? "Laravel" : marker?.[0] || null,
+    package_status: probe.http === 404 ? "not_found" : [401, 403].includes(probe.http) ? "protected" : "unknown",
+    message: [401, 403].includes(probe.http) ? "Package discovery requires sign-in. Make /.well-known/chattrn.json public or continue manually."
+      : laravel ? "Laravel detected; the package discovery endpoint was not found. Install or update the package."
+      : marker ? "Another framework was detected. You can still continue if Laravel powers your backend."
+      : "No public package endpoint found. Framework is unknown; Laravel cannot be ruled out." };
 }
-
 module.exports = { sniffFramework };

@@ -18,6 +18,7 @@ const CC = require("./chattrn-connector");
 const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
+const Drafts = require("../public/onboarding-drafts");
 const { ensurePackageReady } = require("./package-ready");
 
 // Serialize exchanges within this process; PostgreSQL revisions protect cross-process writes.
@@ -81,6 +82,30 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("GET", "/api/health", async () => ({ body: { ok: true, version: "0.1.0" } }));
 
   route("GET", "/api/stores", async () => ({ body: { stores: await db.list() } }));
+
+  route("GET", "/api/stores/:id/onboarding-draft", async ({ params }) => {
+    const s = await findStore(params.id);
+    const draft = s.onboarding_draft;
+    return { body: { draft: draft && Date.now() - Date.parse(draft.saved_at) < Drafts.TTL ? draft : null } };
+  });
+  route("PUT", "/api/stores/:id/onboarding-draft", async ({ params, body }) => {
+    const s = await findStore(params.id);
+    let draft;
+    try { draft = Drafts.sanitize(body); }
+    catch { throw new HttpError(422, "invalid_draft", "Choose a valid connection type for this draft."); }
+    if (draft.kind !== s.connection_type) throw new HttpError(409, "wrong_connection_type", "Draft belongs to another connection type.");
+    draft.store_id = s.id;
+    draft.saved_at = new Date().toISOString();
+    s.onboarding_draft = draft;
+    await db.put(s);
+    return { body: { draft } };
+  });
+  route("DELETE", "/api/stores/:id/onboarding-draft", async ({ params }) => {
+    const s = await findStore(params.id);
+    delete s.onboarding_draft;
+    await db.put(s);
+    return { body: { ok: true } };
+  });
 
   const cleanChattrnBase = (raw) => {
     if (typeof raw !== "string" || !raw.trim()) throw new HttpError(400, "base_url_required", "Enter the base URL of your Chattrn API.");
@@ -353,7 +378,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       {
         key: "config_resolves", label: "Store paired with Chattrn",
         state: used ? "pass" : "pending",
-        message: used ? "Pairing exchange completed" : "Waiting for the package to read it. A stale config:cache is the usual cause.",
+        message: used ? "Pairing exchange completed" : "Waiting for the package. During deployment it retries temporary connection failures up to four times; check startup logs if this remains pending.",
       },
       {
         key: "access_token_issued", label: "Access token issued",
@@ -715,6 +740,9 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       }
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/flow-tester")) {
         return serveFile(res, path.join(publicDir, "flow-tester.html"), "text/html; charset=utf-8");
+      }
+      if (req.method === "GET" && url.pathname === "/onboarding-drafts.js") {
+        return serveFile(res, path.join(publicDir, "onboarding-drafts.js"), "application/javascript; charset=utf-8");
       }
       if (req.method === "GET" && url.pathname === "/openapi.yaml") {
         return serveFile(res, path.join(publicDir, "openapi.yaml"), "text/yaml; charset=utf-8");
