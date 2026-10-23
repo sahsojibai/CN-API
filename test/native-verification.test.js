@@ -87,7 +87,7 @@ test("native HTTP flow verifies both catalog pages without merchant writes", asy
   const site = await listen(merchant.server);
   const base = await listen(app.server);
   try {
-    const created = await fetch(base + "/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Native", connection_type: "chattrn_api", delivery_mode: "zone", base_url: site + merchant.PREFIX, access_token: merchant.TOKEN }) });
+    const created = await fetch(base + "/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Native", brand: "Brand A", connection_type: "chattrn_api", delivery_mode: "zone", base_url: site + merchant.PREFIX, access_token: merchant.TOKEN }) });
     assert.equal(created.status, 201);
     const { id } = await created.json();
     const post = route => fetch(`${base}/api/stores/${id}/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

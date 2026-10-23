@@ -503,7 +503,7 @@ details summary { margin-top: 4px; }
             <div class="field"><label for="cSiteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="cSiteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="cBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="cBrand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="cBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="cBrand"><option value="">Select a brand</option></select><span class="hint">One connected store per brand. Disconnect its current store to reuse it.</span></div>
             <div class="field"><label for="cStoreType">Store Type <span style="color:var(--fail)">*</span></label>
               <select id="cStoreType" aria-label="Store Type"><option value="zone" selected>Zone-based</option><option value="outlet">Outlet-based</option></select>
             </div>
@@ -578,7 +578,7 @@ details summary { margin-top: 4px; }
             <div class="field"><label for="lSiteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="lSiteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="lBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="lBrand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="lBrand">Assign brand <span style="color:var(--fail)">*</span></label><select id="lBrand"><option value="">Select a brand</option></select><span class="hint">One connected store per brand. Disconnect its current store to reuse it.</span></div>
             <div class="field"><label for="lStoreType">Store Type <span style="color:var(--fail)">*</span></label>
               <select id="lStoreType" aria-label="Store Type"><option value="zone" selected>Zone-based</option><option value="outlet">Outlet-based</option></select>
             </div>
@@ -703,7 +703,7 @@ details summary { margin-top: 4px; }
             <div class="field"><label for="siteUrl">Website URL <span style="color:var(--fail)">*</span></label><input type="text" id="siteUrl" placeholder="https://your-store.com" autocomplete="off"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="brand">Assign brand <span style="color:var(--fail)">*</span></label><select id="brand"><option>Select a brand</option><option>Your brand</option></select></div>
+            <div class="field"><label for="brand">Assign brand <span style="color:var(--fail)">*</span></label><select id="brand"><option value="">Select a brand</option></select><span class="hint">One connected store per brand. Disconnect its current store to reuse it.</span></div>
             <div class="field"><label for="storeType">Store Type <span style="color:var(--fail)">*</span></label>
               <select id="storeType" aria-label="Store Type">
                 <option value="zone" selected>Zone-based</option>
@@ -1913,6 +1913,26 @@ details summary { margin-top: 4px; }
     if (result.http !== 200) throw new Error(result.body.error?.message || "Could not save delivery settings.");
   }
 
+  async function refreshBrandChoices() {
+    try {
+      var response = await backend("GET", "/api/brands");
+      if (response.http !== 200) throw new Error("Could not load brands. Reload and try again.");
+      [["brand", state.storeId], ["cBrand", cState.storeId], ["lBrand", lState.storeId]].forEach(function(entry) {
+        var select = $(entry[0]), selected = select.value;
+        select.replaceChildren(new Option("Select a brand", ""));
+        response.body.brands.forEach(function(brand) {
+          var occupied = brand.connected_store_id && brand.connected_store_id !== entry[1];
+          var option = new Option(brand.name + (occupied ? " — already connected" : ""), brand.id);
+          option.disabled = !!occupied;
+          select.add(option);
+        });
+        select.value = selected;
+        if (select.selectedIndex < 0) select.selectedIndex = 0;
+        select.title = "One connected store per brand. Disconnect its current store to reuse a brand.";
+      });
+    } catch (error) { setBanner(error.message); }
+  }
+
   async function recordSetupReview(id) {
     var res = await backend("POST", "/api/stores/" + id + "/onboarding/review", {});
     if (res.http !== 200) throw new Error(res.body.error?.message || "Could not record the review.");
@@ -2095,7 +2115,7 @@ details summary { margin-top: 4px; }
     finally { button.disabled = state.step === 3 && !state.progress.verified; }
   });
   $("storeType").addEventListener("change", function () { setMode($("storeType").value); resetBackendStore(); });
-  ["base", "auth", "header", "key", "siteUrl"].forEach(function (id) {
+  ["base", "auth", "header", "key", "siteUrl", "brand"].forEach(function (id) {
     $(id).addEventListener("change", resetBackendStore);
   });
   // Asks the backend which parameter name this store reads its zone from, and fills it in.
@@ -2213,6 +2233,7 @@ details summary { margin-top: 4px; }
     loadStores();
   }
   function showWizard() {
+    refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
     $("wizardView").hidden = false;
@@ -2618,6 +2639,7 @@ details summary { margin-top: 4px; }
   function resetChattrnStore() { cState.storeId = null; cState.progress = {}; }
 
   function showChattrnWizard() {
+    refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
     $("chattrnWizardView").hidden = false;
@@ -2713,7 +2735,7 @@ details summary { margin-top: 4px; }
     await finishChattrnConnection();
   });
 
-  ["cBase", "cToken", "cSiteUrl"].forEach(function (id) { $(id).addEventListener("change", resetChattrnStore); });
+  ["cBase", "cToken", "cSiteUrl", "cBrand"].forEach(function (id) { $(id).addEventListener("change", resetChattrnStore); });
 
   function checkRowHtml(c) {
     var cls = c.state === "passed" || c.state === "pass" ? "b-pass" : c.state === "failed" || c.state === "error" ? "b-fail" : c.state === "needs_attention" || c.state === "warning" ? "b-warn" : "b-skip";
@@ -2810,6 +2832,7 @@ details summary { margin-top: 4px; }
   function resetLaravelStore() { lState.progress = {}; $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
 
   function showLaravelWizard() {
+    refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
     $("laravelWizardView").hidden = false;

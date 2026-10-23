@@ -20,6 +20,7 @@ const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
 const { configurationStamp, activationProblem } = require("./onboarding");
 const Drafts = require("../public/onboarding-drafts");
+const { assertBrandAvailable, brandDirectory, brandKey } = require("./brands");
 const { ensurePackageReady } = require("./package-ready");
 
 // Serialize exchanges within this process; PostgreSQL revisions protect cross-process writes.
@@ -82,6 +83,8 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
 
   route("GET", "/api/health", async () => ({ body: { ok: true, version: "0.1.0" } }));
 
+  route("GET", "/api/brands", async () => ({ body: { brands: brandDirectory(await db.list()) } }));
+
   route("GET", "/api/stores", async () => ({ body: { stores: await db.list() } }));
 
   route("GET", "/api/stores/:id/onboarding-draft", async ({ params }) => {
@@ -134,6 +137,14 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       test_runs: [],
       created_at: new Date().toISOString(),
     };
+
+    const stores = await db.list();
+    if (shared.brand) {
+      const brand = brandDirectory(stores).find(brand => brandKey(brand.id) === brandKey(shared.brand));
+      if (!brand) throw new HttpError(422, "brand_not_found", "Choose a brand from the available brand list.");
+      shared.brand = brand.id;
+    }
+    assertBrandAvailable(stores, shared);
 
     if (connection_type === "chattrn_api") {
       const base = cleanChattrnBase(body.base_url);
@@ -632,6 +643,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   });
   route("POST", "/api/stores/:id/activate", async ({ params }) => {
     const s = await findStore(params.id);
+    assertBrandAvailable(await db.list(), s, { required: true });
     const problem = activationProblem(s);
     if (problem) throw new HttpError(409, "verification_required", problem);
     s.status = "connected";

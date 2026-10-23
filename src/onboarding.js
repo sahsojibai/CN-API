@@ -16,6 +16,7 @@ function configurationStamp(store) {
   ]));
   const settings = {
     type: store.connection_type,
+    brand: store.brand,
     base: store.base_url,
     auth: store.auth,
     chattrn: store.chattrn && { base: store.chattrn.base_url, credential: store.chattrn.access_token_enc },

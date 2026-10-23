@@ -3,6 +3,7 @@
 // never leaves a half-written file. Good enough for one process; swap for Postgres later.
 const fs = require("node:fs");
 const path = require("node:path");
+const { assertBrandAvailable } = require("./brands");
 
 class Db {
   constructor(file) {
@@ -18,18 +19,20 @@ class Db {
 
   // Internal view (includes auth.secret_enc). Do not return this from an HTTP route.
   find(id) {
-    return this.data.stores[id] || null;
+    return this.data.stores[id] ? structuredClone(this.data.stores[id]) : null;
   }
 
   // The Laravel package's register call only has the plaintext connection token, not a store id,
   // so it's looked up by the hash of the pending one-time token (src/laravel-token.js).
   findByLaravelTokenHash(hash) {
-    return Object.values(this.data.stores).find((s) => s.laravel && s.laravel.connection_token_hash === hash) || null;
+    const store = Object.values(this.data.stores).find((s) => s.laravel && s.laravel.connection_token_hash === hash);
+    return store ? structuredClone(store) : null;
   }
 
   put(store) {
+    if (store.status === "connected") assertBrandAvailable(Object.values(this.data.stores), store, { required: true });
     store.updated_at = new Date().toISOString();
-    this.data.stores[store.id] = store;
+    this.data.stores[store.id] = structuredClone(store);
     this.flush();
     return store;
   }

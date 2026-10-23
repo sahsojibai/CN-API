@@ -168,3 +168,36 @@ The canonical PHP source and release CI live in
 [sahnewajsojib123/chattrn-connector](https://github.com/sahnewajsojib123/chattrn-connector).
 The former embedded package directory contains a pointer only. Backend CI tests
 Node 22/24 with PostgreSQL and checks that duplicate PHP sources do not return.
+
+### One connected store per brand
+
+`GET /api/brands` supplies five default test identities, Brand A through Brand E,
+plus existing legacy brand assignments. All three setup forms use this directory.
+Occupied brands are disabled unless editing their own connection. New connections
+may only choose a directory brand; brand names are compared without surrounding
+spaces or case differences. A brand is required at activation.
+
+The backend rejects occupied brands during creation and activation with HTTP 409
+`brand_in_use`. Drafts do not reserve a brand. Disconnecting releases the brand;
+reconnecting a former store cannot displace its replacement. Configuration reviews
+include the assigned brand. PostgreSQL's partial unique index arbitrates concurrent
+activation, across processes and connection options. JSON development storage checks
+the same invariant before persisting a connected store.
+
+Before deploying onto an existing database, check for duplicate active assignments:
+
+```sql
+SELECT lower(btrim(document->>'brand')) AS brand, array_agg(id) AS store_ids
+FROM chattrn_stores
+WHERE document->>'status' = 'connected'
+  AND nullif(btrim(document->>'brand'), '') IS NOT NULL
+GROUP BY lower(btrim(document->>'brand'))
+HAVING count(*) > 1;
+```
+
+If duplicates exist, disconnect the extra stores in the current dashboard before
+deploying. The migration refuses duplicates and does not choose a winner or delete
+connections. This standalone tester's seeded brands are connection identities;
+they do not provision AI agents or knowledge bases in an external Chattrn account.
+When integrating with Chattrn's brand directory, use its immutable brand IDs as
+this identity, retaining the database uniqueness rule.
