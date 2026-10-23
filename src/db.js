@@ -79,7 +79,6 @@ function publicView(store) {
     out.catalog_sync = { id: job.id, status: job.status, phase: job.phase, locations_done: job.locations_done, error: job.error,
       products_total: job.products_total ?? (catalog_build || store.catalog)?.products?.length ?? 0, next_sync_at: job.next_sync_at, plan: job.plan && { locations: job.plan.locations } };
   }
-  if (onboarding_draft) out.onboarding_draft_saved_at = onboarding_draft.saved_at;
   if (auth) out.auth = { mode: auth.mode, header: auth.header || null, key_saved: !!auth.secret_enc };
   if (chattrn) out.chattrn = { base_url: chattrn.base_url, api_version: chattrn.api_version || null, capabilities: chattrn.capabilities || null, token_saved: !!chattrn.access_token_enc };
   // Never expose the one-time connection-token hash, or whether one is pending, beyond what the

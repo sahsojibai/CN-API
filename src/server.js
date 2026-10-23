@@ -21,7 +21,6 @@ const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
 const { configurationStamp, activationProblem } = require("./onboarding");
-const Drafts = require("../public/onboarding-drafts");
 const { assertBrandAvailable, brandDirectory, brandKey } = require("./brands");
 const { ensurePackageReady } = require("./package-ready");
 
@@ -89,30 +88,6 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   route("GET", "/api/brands", async () => ({ body: { brands: brandDirectory(await db.list()) } }));
 
   route("GET", "/api/stores", async () => ({ body: { stores: await db.list() } }));
-
-  route("GET", "/api/stores/:id/onboarding-draft", async ({ params }) => {
-    const s = await findStore(params.id);
-    const draft = s.onboarding_draft;
-    return { body: { draft: draft && Date.now() - Date.parse(draft.saved_at) < Drafts.TTL ? draft : null } };
-  });
-  route("PUT", "/api/stores/:id/onboarding-draft", async ({ params, body }) => {
-    const s = await findStore(params.id);
-    let draft;
-    try { draft = Drafts.sanitize(body); }
-    catch { throw new HttpError(422, "invalid_draft", "Choose a valid connection type for this draft."); }
-    if (draft.kind !== s.connection_type) throw new HttpError(409, "wrong_connection_type", "Draft belongs to another connection type.");
-    draft.store_id = s.id;
-    draft.saved_at = new Date().toISOString();
-    s.onboarding_draft = draft;
-    await db.put(s);
-    return { body: { draft } };
-  });
-  route("DELETE", "/api/stores/:id/onboarding-draft", async ({ params }) => {
-    const s = await findStore(params.id);
-    delete s.onboarding_draft;
-    await db.put(s);
-    return { body: { ok: true } };
-  });
 
   const cleanChattrnBase = (raw) => {
     if (typeof raw !== "string" || !raw.trim()) throw new HttpError(400, "base_url_required", "Enter the base URL of your Chattrn API.");
@@ -451,7 +426,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     if (res.http === 422 && res.json) return { status: 422, body: res.json };
     if (res.http !== 200 || !res.json) {
       if ([502, 503, 504].includes(res.http) || res.error === "timeout") {
-        throw new HttpError(503, "save_unconfirmed", "The store connection was interrupted. Save could not be confirmed; your draft is kept here. Wait a moment, then save again. Do not generate a new token.");
+        throw new HttpError(503, "save_unconfirmed", "The store connection was interrupted. Save could not be confirmed; your connection settings are kept here. Wait a moment, then save again. Do not generate a new token.");
       }
       throw new HttpError(502, "package_unreachable", `The package did not save the mapping (HTTP ${res.http || "unavailable"}).`);
     }
@@ -802,9 +777,6 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
         return serveFile(res, path.join(publicDir, "flow-tester.html"), "text/html; charset=utf-8");
       }
       if (req.method === "GET" && url.pathname === "/setup-flow.js") return serveFile(res, path.join(publicDir, "setup-flow.js"), "application/javascript; charset=utf-8");
-      if (req.method === "GET" && url.pathname === "/onboarding-drafts.js") {
-        return serveFile(res, path.join(publicDir, "onboarding-drafts.js"), "application/javascript; charset=utf-8");
-      }
       if (req.method === "GET" && url.pathname === "/openapi.yaml") {
         return serveFile(res, path.join(publicDir, "openapi.yaml"), "text/yaml; charset=utf-8");
       }
