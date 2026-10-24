@@ -271,6 +271,7 @@ async function runTests(ctx, store, input = {}) {
     ],
     checks,
     data_quality: dq,
+    products_checked: sample.length,
     sample_products: sampleProducts,
     fields_understood: fields,
     summary: {
@@ -303,6 +304,7 @@ function pickSamples(products) {
       stock: p.stock,
       variants: p.variants.some((v) => !v.default) ? p.variants.length : 0,
       images: p.images.length,
+      image_url: p.images[0] || null,
       kind: p.variants.some((v) => !v.default) ? "with variants" : p.stock === 0 ? "out of stock" : "no variants",
     });
   }

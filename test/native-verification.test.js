@@ -15,6 +15,8 @@ test("verification distinguishes advertised cancellation and diagnoses missing m
   const run = await runChattrnTests({}, { chattrn: {} });
   assert.equal(run.checks.find(c => c.label === "Cancel order").state, "capability_only");
   assert.equal(run.summary.capability_only, 1);
+  assert.equal(run.sample_products[0].title, "Phone");
+  assert.equal(run.sample_products[0].price, "20.00");
   assert.doesNotMatch(run.checks.find(c => c.label === "Catalog").message, /images/);
   assert.equal(run.can_continue, true);
   assert.equal(run.checks.find(c => c.label === "Update order").state, "not_supported");

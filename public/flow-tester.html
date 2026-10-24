@@ -529,7 +529,7 @@ details summary { margin-top: 4px; }
       <!-- STEP 2: Test connection -->
       <section data-cpanel="2" hidden><div class="card"><h3>Review API capabilities</h3><p class="hint">Your API already uses the Chattrn schema. Review the advertised capabilities; verification checks which ones work. No field mapping is required.</p><div id="cReviewPanel"></div></div></section>
       <section data-cpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
-        <div id="cTestPanel"></div>
+        <div id="cTestPanel" style="display:flex;flex-direction:column;gap:20px"></div>
       </section>
 
       <!-- STEP 3: Delivery setup -->
@@ -2710,7 +2710,7 @@ details summary { margin-top: 4px; }
 
   function checkRowHtml(c) {
     var cls = c.state === "passed" || c.state === "pass" ? "b-pass" : c.state === "failed" || c.state === "error" ? "b-fail" : c.state === "needs_attention" || c.state === "warning" ? "b-warn" : "b-skip";
-    var label = c.state === "passed" ? "Passed" : c.state === "pass" ? "Pass" : c.state === "failed" ? "Failed" : c.state === "needs_attention" ? "Needs attention" : c.state === "warning" ? "Warning" : c.state === "capability_only" ? "Advertised only" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : c.state;
+    var label = c.state === "passed" ? "Passed" : c.state === "pass" ? "Pass" : c.state === "failed" ? "Failed" : c.state === "needs_attention" ? "Needs attention" : c.state === "warning" ? "Warning" : c.state === "capability_only" ? "Pending verification" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : c.state;
     return '<div class="check-row"><span class="label">' + esc(c.label) + '</span><span class="msg">' + esc(c.message || "") + '</span><span class="badge ' + cls + '">' + esc(label) + '</span></div>';
   }
 
@@ -2725,11 +2725,30 @@ details summary { margin-top: 4px; }
       if (cState.step !== 3 || cState.storeId !== id) return;
       var run = res.body; cState.progress.verified = run.can_continue === true;
       ChattrnSetup.render(document.querySelectorAll(".cstep"), cState.step, cState.progress);
-      var checksHtml = '<div class="card"><h3 class="card-title">Test connection</h3><div class="check-list">' +
-        run.checks.map(checkRowHtml).join("") + '</div></div>';
-      var dqHtml = '<div class="card"><h3 class="card-title">Data quality</h3><div class="dq-list check-list">' +
-        (run.data_quality || []).map(checkRowHtml).join("") + '</div></div>';
-      $("cTestPanel").innerHTML = checksHtml + dqHtml + '<p id="nativeCatalogProgress" class="hint"></p>';
+      var checks = run.checks || [];
+      var dq = run.data_quality || [];
+      var passed = checks.filter(function (c) { return c.state === "passed" || c.state === "pass"; }).length;
+      var attention = checks.filter(function (c) { return c.state === "needs_attention" || c.state === "warning" || c.state === "warn"; }).length;
+      var failed = checks.filter(function (c) { return c.state === "failed" || c.state === "error"; }).length;
+      var pending = checks.filter(function (c) { return c.state === "capability_only"; }).length;
+      var banner = '<div class="banner ' + (run.can_continue ? 'ok' : 'warn') + '">' +
+        '<span class="ico ' + (run.can_continue ? 'ico-pass' : 'ico-warn') + ' big">' + (run.can_continue ? '&#10003;' : '!') + '</span>' +
+        '<div class="banner-body"><strong>' + (run.can_continue ? 'Connection verified' : 'Verification needs attention') + '</strong>' +
+        '<span class="hint" style="margin:0">Chattrn API schema and live store responses checked</span></div>' +
+        '<span class="hint" style="margin:0">Checked just now</span>' +
+        '<button type="button" class="primary" id="cRerun" style="background:#1c8274">Run test again</button></div>';
+      var checksHtml = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test connection</div>' +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (pending ? " · " + pending + " pending verification" : "") + '</p></div>' +
+        '<div class="check-list">' + checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + '</div></div>';
+      var dqHtml = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
+        '<p class="hint" style="margin-top:4px">A connection can respond and still send data the AI can’t use well. These checks catch that before customers do.</p></div>' +
+        (run.products_checked ? '<span class="badge b-skip">Checked on ' + esc(String(run.products_checked)) + ' products</span>' : '') +
+        '</div><div class="dq-list check-list">' + dq.map(function (c) { return lVerifyRowHtml(c, false); }).join("") + '</div></div>';
+      var sampleHtml = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Sample products from your store</div>' +
+        '<p class="hint" style="margin-top:4px">Check these look right — this is how the AI Agent and the inbox will see your products.</p></div>' +
+        lSampleTableHtml(run.sample_products || [], run.fields_understood || [], "No sample products came back from the connected store.") + '</div>';
+      $("cTestPanel").innerHTML = banner + checksHtml + dqHtml + sampleHtml + '<p id="nativeCatalogProgress" class="hint"></p>';
+      $("cRerun").addEventListener("click", runChattrnTest);
       if (run.can_continue) watchCatalog(id, "nativeCatalogProgress");
       $("cNext").disabled = !run.can_continue;
       if (!run.can_continue) $("cCheckMsg").textContent = "Required connection checks must pass before continuing.";
@@ -3226,26 +3245,29 @@ details summary { margin-top: 4px; }
     var badge = st === "pass" ? '<span class="badge b-pass">Passed</span>'
       : st === "warn" ? '<span class="badge b-warn">Needs attention</span>'
       : st === "fail" ? '<span class="badge b-fail">Failed</span>'
-      : '<span class="badge b-skip">' + (c.state === "capability_only" ? "Advertised only" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : "Not configured") + '</span>';
+      : '<span class="badge b-skip">' + (c.state === "capability_only" ? "Pending verification" : c.state === "not_supported" ? "Not supported" : c.state === "not_run" ? "Not run" : "Not configured") + '</span>';
     return '<div class="crow"><span class="ico ico-' + st + '">' + icon + '</span><div class="crow-body">' +
       '<span class="crow-title">' + esc(c.label) + "</span>" +
       '<span class="hint" style="margin:0">' + esc(c.message || "") + "</span></div>" +
       (withBadge ? badge : "") + "</div>";
   }
 
-  function lSampleTableHtml(products, fields) {
-    if (!products || !products.length) return '<p class="hint">No products came back through the mapping yet.</p>';
+  function lSampleTableHtml(products, fields, emptyMessage) {
+    if (!products || !products.length) return '<p class="hint">' + esc(emptyMessage || "No products came back through the mapping yet.") + '</p>';
     var rows = products.slice(0, 3).map(function (p) {
-      var v = (p.variants && p.variants[0]) || {};
-      var price = v.price != null ? v.price : p.price;
-      var was = v.compare_at_price != null ? v.compare_at_price : null;
-      var count = (p.variants || []).length;
-      var firstImage = p.images && p.images[0];
+      var variants = Array.isArray(p.variants) ? p.variants : [];
+      var v = variants[0] || {};
+      var price = p.price != null ? p.price : v.price;
+      var was = p.compare_at_price != null ? p.compare_at_price : v.compare_at_price;
+      var count = variants.length || (typeof p.variants === "number" ? p.variants : 0);
+      var firstImage = Array.isArray(p.images) ? p.images[0] : null;
       var img = (typeof firstImage === "string" ? firstImage : firstImage && firstImage.src) || p.image_url || null;
-      var qty = (p.variants || []).reduce(function (a, x) {
+      var qty = variants.reduce(function (a, x) {
         return a + (typeof x.inventory_quantity === "number" ? x.inventory_quantity : (typeof x.stock === "number" ? x.stock : 0));
       }, 0);
-      var hasQty = (p.variants || []).some(function (x) { return typeof x.inventory_quantity === "number" || typeof x.stock === "number"; });
+      var hasVariantQty = variants.some(function (x) { return typeof x.inventory_quantity === "number" || typeof x.stock === "number"; });
+      var hasQty = hasVariantQty || typeof p.stock === "number";
+      if (!hasVariantQty && typeof p.stock === "number") qty = p.stock;
       var stock = !hasQty ? '<span class="badge b-skip">Unknown</span>'
         : qty > 0 ? '<span class="badge b-pass">In stock</span>'
         : '<span class="badge b-fail">Out of stock</span>';
@@ -3303,7 +3325,7 @@ details summary { margin-top: 4px; }
         '<button type="button" class="primary" id="lRerun" style="background:#1c8274">Run test again</button></div>';
 
       var testCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test results</div>' +
-        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (advertised ? " · " + advertised + " advertised only" : "") + "</p></div>" +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (advertised ? " · " + advertised + " pending verification" : "") + "</p></div>" +
         checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + "</div>";
 
       var dqCard = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +

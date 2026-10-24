@@ -269,6 +269,7 @@ async function runChattrnTests(ctx, store, input = {}) {
     can_continue: ["Store profile", "Catalog", "Live stock and price", ...(caps.product_search === false ? [] : ["Product search"])].every(label => checks.some(c => c.label === label && c.state === "passed")) && pagesComplete && all.length > 0,
     checks,
     data_quality: dq,
+    products_checked: n,
     sample_products: sampleProducts,
     fields_understood: fields,
     summary: {
@@ -291,6 +292,7 @@ function pickSamples(products) {
     out.push({
       id: p.id, title: p.title, price: p.price, compare_at_price: p.compare_at_price, stock: p.stock,
       variants: p.variants.some((v) => !v.default) ? p.variants.length : 0, images: p.images.length,
+      image_url: p.images[0] || null,
       kind: p.variants.some((v) => !v.default) ? "with variants" : p.stock === 0 ? "out of stock" : "no variants",
     });
   }
