@@ -403,6 +403,8 @@ details summary { margin-top: 4px; }
           </div>
           <button type="button" class="btn-connect" id="connectBtn">Connect</button>
         </div>
+        <p id="storeListStatus" role="status" hidden></p>
+        <button type="button" class="plain" id="retryStoreList" hidden>Retry loading stores</button>
         <div class="list-tools" id="listTools" hidden>
           <label class="search-field"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input type="search" id="storeSearch" placeholder="Search" autocomplete="off" aria-label="Search connected stores"></label>
         </div>
@@ -2186,13 +2188,17 @@ details summary { margin-top: 4px; }
     $("listBanner").hidden = !text;
   }
   async function loadStores() {
+    $("storeListStatus").hidden = true;
+    $("retryStoreList").hidden = true;
     $("storeRows").innerHTML = '<tr><td colspan="5" class="hint">Loading connected stores…</td></tr>';
     var res;
     try { res = await backend("GET", "/api/stores"); } catch (e) { res = { http: 0, body: {} }; }
     if (res.http !== 200) {
       $("listTools").hidden = true;
       $("storeTableWrap").hidden = true;
-      $("storeRows").innerHTML = '<tr><td colspan="5" style="color:var(--fail)">Could not load the connected stores. Check that the Chattrn backend is running.</td></tr>';
+      $("storeListStatus").hidden = false;
+      $("storeListStatus").textContent = "Could not load your connected stores. The server or database is unavailable. This does not mean your connections were removed. Retry when the service is available.";
+      $("retryStoreList").hidden = false;
       return;
     }
     storeList = (res.body.stores || []).filter(function (s) { return s.status === "connected"; });
@@ -2200,6 +2206,10 @@ details summary { margin-top: 4px; }
     var hasStores = storeList.length > 0;
     $("listTools").hidden = !hasStores;
     $("storeTableWrap").hidden = !hasStores;
+    if (!hasStores) {
+      $("storeListStatus").hidden = false;
+      $("storeListStatus").textContent = "No activated store connections were returned. A connection appears here after activation completes.";
+    }
     renderStores();
   }
   function renderStores() {
@@ -2258,6 +2268,7 @@ details summary { margin-top: 4px; }
     if (!e.target.closest || (!e.target.closest("#storeMenu") && !e.target.closest(".icon-btn"))) closeStoreMenu();
   });
   $("storeSearch").addEventListener("input", renderStores);
+  $("retryStoreList").addEventListener("click", loadStores);
   $("connectBtn").addEventListener("click", function () { resetBackendStore(); setBanner(""); showChoice(); });
   $("backFromChoice").addEventListener("click", showList);
   $("chooseMappedApi").addEventListener("click", function () { resetBackendStore(); showWizard(); });

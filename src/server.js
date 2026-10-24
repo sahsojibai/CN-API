@@ -585,6 +585,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   // ---- test runs and products ----
 
   route("POST", "/api/stores/:id/catalog/sync", async ({ params, body }) => {
+    if (!catalogJobs.enabled) throw new HttpError(503, "catalog_paused", "Catalog imports are paused by the administrator. Existing connections and saved catalog data are preserved.");
     const s = await findStore(params.id);
     try { await beginSync(ctx, s, { retry: !!body.retry, refresh: true }); }
     catch (error) { throw new HttpError(422, "catalog_setup", error.message); }
@@ -592,7 +593,10 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     return { status: 202, body: syncStatus(s) };
   });
 
-  route("GET", "/api/stores/:id/catalog/status", async ({ params }) => ({ body: syncStatus(await findStore(params.id)) }));
+  route("GET", "/api/stores/:id/catalog/status", async ({ params }) => {
+    const status = syncStatus(await findStore(params.id));
+    return { body: catalogJobs.enabled ? status : {...status, status:"paused", imports_enabled:false, error:"Catalog imports are paused by the administrator. Saved progress is preserved."} };
+  });
 
   route("GET", "/api/stores/:id/catalog", async ({ params, query }) => {
     const s = await findStore(params.id);
@@ -634,7 +638,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     if (problem) throw new HttpError(409, "verification_required", problem);
     s.status = "connected";
     s.onboarding.activated_at = new Date().toISOString();
-    if (s.base_url || s.chattrn?.base_url) await beginSync(ctx, s);
+    if (catalogJobs.enabled && (s.base_url || s.chattrn?.base_url)) await beginSync(ctx, s);
     await db.put(s, {catalog:true});
     catalogJobs.wake();
     return { body: { state: "connected", store: publicView(s) } };
@@ -646,7 +650,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       ? await runChattrnTests(ctx, s, {})
       : await runTests(ctx, s, { phone: body.phone || null, zone: body.zone ?? null, rediscover: !!body.rediscover });
     run.configuration_stamp = configurationStamp(s);
-    if (run.can_continue && s.onboarding?.review_stamp === run.configuration_stamp) {
+    if (catalogJobs.enabled && run.can_continue && s.onboarding?.review_stamp === run.configuration_stamp) {
       await beginSync(ctx, s);
       await db.put(s, {catalog:true});
       catalogJobs.wake();

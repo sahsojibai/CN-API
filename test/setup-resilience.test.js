@@ -26,3 +26,20 @@ test("discovery rejects external API paths and treats login pages as inconclusiv
   const result = await sniffFramework("https://store.test", async opts => opts.url.includes("well-known") ? { http: 200, json: { package: "chattrn/connector", framework: "Laravel", api_path: "//evil.test/api" } } : { http: 401, text: "Sign in" });
   assert.notEqual(result.package_status, "installed"); assert.equal(result.laravel_likely, null);
 });
+
+test("disabled catalog imports never poll the database, including explicit wakes", async () => {
+  const previous = process.env.CHATTRN_CATALOG_IMPORTS_ENABLED;
+  process.env.CHATTRN_CATALOG_IMPORTS_ENABLED = 'false';
+  let polls = 0;
+  const jobs = require('../src/catalog-jobs').createCatalogJobs({db:{pendingCatalogJobs:async()=>{polls++;return [];}}});
+  try {
+    assert.equal(jobs.enabled,false);
+    jobs.start(); jobs.wake();
+    await new Promise(resolve=>setTimeout(resolve,25));
+    assert.equal(polls,0);
+  } finally {
+    jobs.stop();
+    if(previous===undefined) delete process.env.CHATTRN_CATALOG_IMPORTS_ENABLED;
+    else process.env.CHATTRN_CATALOG_IMPORTS_ENABLED=previous;
+  }
+});

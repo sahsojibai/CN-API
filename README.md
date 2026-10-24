@@ -254,3 +254,10 @@ from the configured inventory model. Flat product stock works without a separate
 Variant model and is only returned for the default location. Older native APIs that
 only expose global product prices retain that contract; location-dependent prices
 must be exposed explicitly, never inferred from a primary-location sample.
+
+### Pause catalog imports
+
+Set `CHATTRN_CATALOG_IMPORTS_ENABLED=false` and redeploy to disable the background
+catalog worker, automatic imports after verification/activation, and manual sync requests.
+The dashboard and saved connections remain accessible. Catalog status reports `paused`;
+existing catalog data and job progress are retained. Set it to `true` and redeploy to resume.

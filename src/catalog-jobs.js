@@ -3,10 +3,11 @@ const { randomUUID } = require("node:crypto");
 const { advanceSync, beginSync } = require("./catalog");
 
 function createCatalogJobs(ctx) {
+  const enabled = process.env.CHATTRN_CATALOG_IMPORTS_ENABLED !== "false";
   const owner = randomUUID();
   let stopped = false, running = false, timer;
   async function tick() {
-    if (stopped || running) return;
+    if (!enabled || stopped || running) return;
     running = true;
     let active = false;
     try {
@@ -43,6 +44,7 @@ function createCatalogJobs(ctx) {
     }
   }
   return {
+    enabled,
     start() { stopped = false; tick(); },
     stop() { stopped = true; clearTimeout(timer); },
     wake() { if (!stopped) { clearTimeout(timer); tick(); } },
