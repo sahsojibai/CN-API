@@ -2326,13 +2326,20 @@ details summary { margin-top: 4px; }
     closeStoreMenu();
     loadStores();
   }
-  function showWizard() {
+  function showWizard(options) {
+    options = options || {};
     refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
     $("wizardView").hidden = false;
     closeStoreMenu();
-    showStep(1);
+    // Existing mapped stores already have credentials, endpoint samples, and
+    // a saved connection. Reopen directly at mapping review instead of
+    // forcing the merchant through connection setup again.
+    if (options.edit && state.storeId) {
+      state.progress = { connected: true };
+      showStep(2);
+    } else showStep(1);
   }
   function showChoice() {
     setCrumbStore("");
@@ -3089,9 +3096,9 @@ details summary { margin-top: 4px; }
     var isChattrn = detailStore.connection_type === "chattrn_api";
     var isLaravel = detailStore.connection_type === "laravel_package";
     if (act === "edit") {
-      if (isLaravel) { prefillLaravelWizard(detailStore); showLaravelWizard(); }
-      else if (isChattrn) { prefillChattrnWizard(detailStore); showChattrnWizard(); }
-      else { prefillWizard(detailStore); showWizard(); }
+      if (isLaravel) { prefillLaravelWizard(detailStore); showLaravelWizard({ edit: true }); }
+      else if (isChattrn) { prefillChattrnWizard(detailStore); showChattrnWizard({ edit: true }); }
+      else { prefillWizard(detailStore); showWizard({ edit: true }); }
     }
     if (act === "disconnect") disconnectStore();
     if (act === "regenerate-token") {
@@ -3162,13 +3169,17 @@ details summary { margin-top: 4px; }
 
   function resetChattrnStore() { cState.storeId = null; cState.progress = {}; }
 
-  function showChattrnWizard() {
+  function showChattrnWizard(options) {
+    options = options || {};
     refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
     $("chattrnWizardView").hidden = false;
     closeStoreMenu();
-    cShowStep(1);
+    if (options.edit && cState.storeId) {
+      cState.progress = { connected: true, reviewed: true };
+      cShowStep(3);
+    } else cShowStep(1);
   }
 
   function cShowStep(n) {
@@ -3375,7 +3386,8 @@ details summary { margin-top: 4px; }
 
   function resetLaravelStore() { lState.progress = {}; $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
 
-  function showLaravelWizard() {
+  function showLaravelWizard(options) {
+    options = options || {};
     refreshBrandChoices();
     setCrumbStore("");
     hideAllViews();
@@ -3385,7 +3397,11 @@ details summary { margin-top: 4px; }
     $("lGenToken").textContent = lState.pendingToken ? "Replace setup token" : "Generate token";
     $("lCopyToken").setAttribute("data-copy", "");
     $("lTokenNote").textContent = "";
-    lShowStep(1);
+    if (options.edit && lState.storeId && lState.progress && lState.progress.connected) {
+      // Mapping edits always reopen at the mapping screen, even when an older
+      // mapping was already saved. The merchant can then verify it explicitly.
+      lShowStep(2);
+    } else lShowStep(1);
   }
 
   var LSTEP_TITLE = [
@@ -3985,7 +4001,7 @@ details summary { margin-top: 4px; }
     brand.value = s.brand || brand.options[0].value;
     $("lStoreType").value = s.delivery && s.delivery.mode === "outlet" ? "outlet" : "zone";
     lState.storeId = s.id;
-    lState.progress = { connected: !!s.laravel?.registered_at };
+    lState.progress = { connected: !!s.laravel?.registered_at, reviewed: !!s.onboarding?.mapping_saved_at };
     lState.pendingToken = !!s.laravel?.token_pending;
     lState.sniffed = true;
   }
