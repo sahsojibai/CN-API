@@ -2690,7 +2690,7 @@ details summary { margin-top: 4px; }
           '<main class="skill-editor-main">' +
             '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="' + esc(existing && existing.name || "") + '" placeholder="e.g. Order status & tracking" autocomplete="off"></div>' +
             '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="' + esc(existing && existing.trigger || "") + '" placeholder="Describe the customer question or intent" autocomplete="off"></div>' +
-            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><div class="skill-instructions-wrap"><div id="skillInstructions" class="skill-instructions-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Tell the AI what to do, step by step.">' + esc(existing && existing.instructions || "") + '</div><div class="skill-insert-bar"><button type="button" class="skill-insert" id="insertSkillAction">⚡ Action</button><button type="button" class="skill-insert" id="insertSkillField">{} Field</button></div><div id="skillInsertMenu" class="skill-insert-menu" hidden></div></div></div>' +
+            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><div class="skill-instructions-wrap"><div id="skillInstructions" class="skill-instructions-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Tell the AI what to do, step by step.">' + skillInstructionMarkup(existing) + '</div><div class="skill-insert-bar"><button type="button" class="skill-insert" id="insertSkillAction">⚡ Action</button><button type="button" class="skill-insert" id="insertSkillField">{} Field</button></div><div id="skillInsertMenu" class="skill-insert-menu" hidden></div></div></div>' +
             '<div class="skill-section"><div><h4>Uses actions</h4><p class="skill-side-help">Filled in from your instructions. Edit the instructions to change it.</p></div><div class="skill-action-chips" id="skillActionChips"></div></div>' +
           '</main>' +
           '<aside class="skill-editor-side">' +
@@ -2709,6 +2709,56 @@ details summary { margin-top: 4px; }
   }
 
   var skillCaretRange = null;
+  function skillInstructionSegments() {
+    var editor = $("skillInstructions"), parts = [];
+    if (!editor) return parts;
+    function visit(node) {
+      if (node.nodeType === 3) { if (node.nodeValue) parts.push({ type: "text", text: node.nodeValue }); return; }
+      if (node.nodeType !== 1) return;
+      if (node.hasAttribute("data-skill-token")) { parts.push({ type: "token", token: node.getAttribute("data-skill-token") || node.textContent || "" }); return; }
+      if (node.tagName === "BR") { parts.push({ type: "text", text: "\n" }); return; }
+      var block = /^(DIV|P|LI)$/.test(node.tagName);
+      Array.from(node.childNodes).forEach(visit);
+      if (block && node.nextSibling) parts.push({ type: "text", text: "\n" });
+    }
+    Array.from(editor.childNodes).forEach(visit);
+    return parts;
+  }
+  function skillInstructionMarkup(existing) {
+    var segments = existing && Array.isArray(existing.instruction_segments) ? existing.instruction_segments : null;
+    if (!segments || !segments.length) {
+      var plain = String(existing && existing.instructions || ""), marker = /\[(ACTION|FIELD):\s*([^\]]+)\]/g, html = "", cursor = 0, match;
+      while ((match = marker.exec(plain))) {
+        html += esc(plain.slice(cursor, match.index));
+        var token = match[1] === "ACTION" ? "Use action: " + match[2].trim() : match[2].trim();
+        html += '<span class="skill-inline-token ' + (match[1] === "ACTION" ? "action" : "field") + '" data-skill-token="' + esc(token) + '" contenteditable="false">' + esc(match[2].trim()) + '</span>';
+        cursor = match.index + match[0].length;
+      }
+      if (cursor) return html + esc(plain.slice(cursor));
+      // Older saves only contained the readable token text. Rehydrate those
+      // exact action/field phrases when their source lists are available.
+      var candidates = skillActionOptions().map(function (row) { return { text: "Use action: " + row.name, token: "Use action: " + row.name, kind: "action" }; })
+        .concat(skillMappedFields().map(function (field) { return { text: field, token: field, kind: "field" }; }))
+        .sort(function (a, b) { return b.text.length - a.text.length; });
+      if (!candidates.length) return esc(plain);
+      var escaped = candidates.map(function (item) { return item.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
+      var phrase = new RegExp(escaped.join("|"), "g"), output = "", position = 0;
+      while ((match = phrase.exec(plain))) {
+        output += esc(plain.slice(position, match.index));
+        var found = candidates.find(function (item) { return item.text === match[0]; });
+        output += '<span class="skill-inline-token ' + found.kind + '" data-skill-token="' + esc(found.token) + '" contenteditable="false">' + esc(found.kind === "action" ? found.text.slice(12) : found.text) + '</span>';
+        position = match.index + match[0].length;
+      }
+      return output + esc(plain.slice(position));
+    }
+    return segments.map(function (part) {
+      if (part && part.type === "token") {
+        var token = String(part.token || ""), isAction = token.indexOf("Use action: ") === 0;
+        return '<span class="skill-inline-token ' + (isAction ? "action" : "field") + '" data-skill-token="' + esc(token) + '" contenteditable="false">' + esc(isAction ? token.slice(12) : token) + '</span>';
+      }
+      return esc(part && part.text || "");
+    }).join("");
+  }
   function rememberSkillCaret() {
     var editor = $("skillInstructions"), selection = window.getSelection();
     if (editor && selection && selection.rangeCount && editor.contains(selection.getRangeAt(0).commonAncestorContainer)) skillCaretRange = selection.getRangeAt(0).cloneRange();
@@ -2910,7 +2960,7 @@ details summary { margin-top: 4px; }
       var note = $("skillEditorNote");
       if (!name || !trigger || !instructions) { if (note) note.textContent = "Name, trigger, and instructions are required."; return; }
       var saveButton = event.target.closest("#saveSkill");
-      var payload = { name: name, trigger: trigger, instructions: instructions, actions: extractSkillActions(instructions), active: $("skillEnabled").getAttribute("aria-pressed") === "true" };
+      var payload = { name: name, trigger: trigger, instructions: instructions, instruction_segments: skillInstructionSegments(), actions: extractSkillActions(instructions), active: $("skillEnabled").getAttribute("aria-pressed") === "true" };
       var skillId = saveButton.getAttribute("data-skill-id");
       var response = await backend(skillId ? "PUT" : "POST", "/api/stores/" + encodeURIComponent(detailStore.id) + "/skills" + (skillId ? "/" + encodeURIComponent(skillId) : ""), payload);
       if (response.http !== 200 && response.http !== 201) { if (note) note.textContent = response.body?.error?.message || "Could not save the skill."; return; }

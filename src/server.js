@@ -41,6 +41,14 @@ const ASK_WHEN = ["always", "when_needed", "never"];
 const CONNECTION_TYPES = ["mapped_api", "chattrn_api", "laravel_package"];
 const CHATTRN_LIKE = ["chattrn_api", "laravel_package"]; // both read through the native Chattrn connector
 
+function normalizeSkillSegments(value) {
+  if (!Array.isArray(value)) return null;
+  return value.slice(0, 1000).map((part) => {
+    if (part && part.type === "token") return { type: "token", token: String(part.token || "").slice(0, 500) };
+    return { type: "text", text: String(part && part.text || "").slice(0, 20000) };
+  }).filter((part) => part.type === "token" ? part.token : part.text);
+}
+
 function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   const db = database || new Db(path.join(dataDir, "stores.json"));
   const ctx = { db, secretKey: secretKey || loadSecretKey(dataDir) };
@@ -205,7 +213,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     if (!instructions || instructions.length > 20000) throw new HttpError(422, "skill_instructions_required", "Add the skill instructions (up to 20,000 characters).");
     const skills = Array.isArray(store.skills) ? store.skills : [];
     if (skills.some(skill => skill.name.toLowerCase() === name.toLowerCase())) throw new HttpError(409, "skill_exists", "A skill with this name already exists.");
-    const skill = { id: randomUUID(), name, trigger, instructions, actions: Array.isArray(body.actions) ? body.actions.map(String).slice(0, 30) : [], knowledge: Array.isArray(body.knowledge) ? body.knowledge.map(String).slice(0, 30) : [], safety: body.safety && typeof body.safety === "object" ? body.safety : {}, active: body.active === true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    const skill = { id: randomUUID(), name, trigger, instructions, instruction_segments: normalizeSkillSegments(body.instruction_segments) || [], actions: Array.isArray(body.actions) ? body.actions.map(String).slice(0, 30) : [], knowledge: Array.isArray(body.knowledge) ? body.knowledge.map(String).slice(0, 30) : [], safety: body.safety && typeof body.safety === "object" ? body.safety : {}, active: body.active === true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
     store.skills = skills.concat(skill);
     await db.put(store);
     return { status: 201, body: { skill } };
@@ -218,6 +226,7 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
     const current = skills[index];
     const next = { ...current };
     for (const key of ["name", "trigger", "instructions"]) if (body[key] !== undefined) next[key] = String(body[key]).trim();
+    if (body.instruction_segments !== undefined) next.instruction_segments = normalizeSkillSegments(body.instruction_segments) || [];
     if (!next.name || !next.trigger || !next.instructions) throw new HttpError(422, "skill_fields_required", "Name, trigger, and instructions are required.");
     if (skills.some((skill, i) => i !== index && skill.name.toLowerCase() === next.name.toLowerCase())) throw new HttpError(409, "skill_exists", "A skill with this name already exists.");
     if (body.actions !== undefined) next.actions = Array.isArray(body.actions) ? body.actions.map(String).slice(0, 30) : [];
