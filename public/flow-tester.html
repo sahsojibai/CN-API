@@ -397,7 +397,7 @@ details summary { margin-top: 4px; }
 .action-toggle[aria-pressed="true"]::after { left:20px; }
 .action-help { color:var(--brand); background:transparent; border:0; font:600 12px/18px Inter,sans-serif; cursor:pointer; }
 @media (max-width:800px) { .action-stat-grid { grid-template-columns:repeat(2,1fr); } .action-toolbar .search-field { margin-left:0; width:100%; } }
-.custom-action-page { display:flex; flex-direction:column; gap:24px; }
+.custom-action-page { display:flex; flex-direction:column; gap:32px; }
 .custom-action-header h2 { margin:0 0 4px; font-size:22px; line-height:34px; color:var(--fg); }
 .custom-action-header p { margin:0; color:var(--muted); font-size:13px; line-height:20px; }
 .custom-action-card { padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
@@ -409,9 +409,11 @@ details summary { margin-top: 4px; }
 .custom-action-field input, .custom-action-field textarea, .custom-action-field select { width:100%; border:1px solid var(--line); border-radius:10px; padding:6px 12px; font:13px/20px Inter,sans-serif; color:var(--fg); background:var(--surface); }
 .custom-action-field textarea { min-height:104px; resize:vertical; }
 .custom-action-kind { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.custom-action-option { display:flex; gap:10px; padding:12px 14px; border:1px solid var(--line2); border-radius:8px; cursor:pointer; }
+.custom-action-option { display:flex; align-items:center; gap:14px; min-height:92px; padding:16px 18px; border:1px solid var(--line2); border-radius:10px; cursor:pointer; transition:border-color .15s,box-shadow .15s; }
 .custom-action-option.selected { border:1.5px solid var(--brand); background:#fff; }
-.custom-action-option input { margin-top:3px; accent-color:var(--brand); }
+.custom-action-option input { appearance:none; width:24px; height:24px; margin:0; flex:none; border:1.5px solid #7b7b7b; border-radius:50%; position:relative; }
+.custom-action-option input:checked { border-color:var(--brand); }
+.custom-action-option input:checked::after { content:""; position:absolute; inset:5px; border-radius:50%; background:var(--brand); }
 .custom-action-option strong { display:block; font-size:13px; line-height:20px; color:var(--fg); }
 .custom-action-option span { display:block; font-size:12px; line-height:18px; color:var(--muted); }
 .custom-action-request { display:grid; grid-template-columns:140px minmax(0,1fr); gap:12px; }
@@ -420,6 +422,9 @@ details summary { margin-top: 4px; }
 .custom-action-inputs th, .custom-action-inputs td { padding:10px 16px; border-bottom:1px solid var(--line2); font-size:12px; text-align:left; }
 .custom-action-inputs th { background:#f8f9fa; color:var(--muted); font-weight:500; }
 .custom-action-inputs tr:last-child td { border-bottom:0; }
+.custom-action-inputs input[type="checkbox"] { appearance:none; width:24px; height:24px; margin:0; border:1px solid #8b8b8b; border-radius:3px; background:#fff; vertical-align:middle; cursor:pointer; }
+.custom-action-inputs input[type="checkbox"]:checked { border-color:#1769e0; background:#1769e0; box-shadow:inset 0 0 0 2px #1769e0; }
+.custom-action-inputs input[type="checkbox"]:checked::after { content:"✓"; display:block; color:#fff; font-size:20px; line-height:22px; text-align:center; font-weight:700; }
 .custom-action-footer { display:flex; justify-content:flex-end; gap:8px; padding-top:4px; }
 @media (max-width:700px) { .custom-action-kind { grid-template-columns:1fr; } .custom-action-request { grid-template-columns:1fr; } .custom-action-card { padding:18px; } }
 /* ---- Connection-type choice and Chattrn API wizard ---- */
@@ -2595,6 +2600,9 @@ details summary { margin-top: 4px; }
       '<div class="card custom-action-card"><h3 class="custom-action-section-title"><span class="custom-action-step">4</span>Test</h3><p class="custom-action-help">Run a read-only request to confirm the path and inputs work before making it available.</p><div class="custom-action-field"><label for="customActionTestValue">Test value</label><input id="customActionTestValue" placeholder="Enter an IMEI"></div><button type="button" class="btn-grey" id="testCustomAction">Test request</button><p class="skill-editor-note" id="customActionNote" role="status"></p></div>' +
       '<div class="custom-action-footer"><button type="button" class="plain" id="cancelCustomAction">Cancel</button><button type="button" class="btn-grey" id="saveCustomActionOff">Save as Off</button><button type="button" class="primary" id="saveCustomAction">Save and enable</button></div></section>';
   }
+  function customActionInputRow() {
+    return '<tr><td><input class="table-input" value="" placeholder="input name"></td><td><select><option value="" selected disabled>Select</option><option>Query</option><option>Body</option></select></td><td><select><option value="" selected disabled>Select source</option><option>Customer says</option><option>AI extracts</option><option>Mapped field</option></select></td><td><input type="checkbox"></td><td><input type="checkbox"></td></tr>';
+  }
   function renderActions() {
     if (!detailStore) return;
     setCrumbStore(detailStore.name || "Store");
@@ -2764,14 +2772,15 @@ details summary { margin-top: 4px; }
       } else $("customActionNote").textContent = "Save the action first, then test it against the connected API.";
       return;
     }
-    if (event.target.closest && event.target.closest("#addActionInput")) { $("customActionNote").textContent = "Add input rows will be connected to action configuration next."; return; }
+    if (event.target.closest && event.target.closest("#addActionInput")) { var inputBody = document.querySelector("#addActionInput").previousElementSibling.querySelector("tbody"); if (inputBody) inputBody.insertAdjacentHTML("beforeend", customActionInputRow()); return; }
     if (event.target.closest && event.target.closest("#saveCustomAction, #saveCustomActionOff")) {
       var customName = $("customActionName").value.trim() || "Custom action";
       if (!$("customActionName").value.trim() || !$("customActionWhen").value.trim() || !$("customActionMethod").value || !$("customActionPath").value.trim() || !document.querySelector('input[name="actionKind"]:checked')) { $("customActionNote").textContent = "Complete the action name, trigger, risk, method, and path first."; return; }
       var custom = actionRows.find(function (r) { return r.name === customName; });
       if (custom) { custom.on = event.target.closest("#saveCustomAction") !== null; custom.status = custom.on ? "Enabled" : "Off"; if (custom.id) { var updatedAction = await backend("PUT", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions/" + encodeURIComponent(custom.id), { active: custom.on }); if (updatedAction.http !== 200) { $("customActionNote").textContent = "Could not update the action."; return; } } }
       else {
-        var customPayload = { name: customName, trigger: $("customActionWhen").value.trim(), method: $("customActionMethod").value, path: $("customActionPath").value.trim(), risk: document.querySelector('input[name="actionKind"]:checked').value === "write" ? "High" : "Low", active: event.target.closest("#saveCustomAction") !== null, inputs: [] };
+        var customInputs = Array.from(document.querySelectorAll(".custom-action-inputs tbody tr")).map(function (row) { var cells = row.querySelectorAll("input,select"); return { name: cells[0].value.trim(), sent_as: String(cells[1].value || "").toLowerCase(), source: cells[2].value, check: cells[3].checked, required: cells[4].checked }; }).filter(function (input) { return input.name; });
+        var customPayload = { name: customName, trigger: $("customActionWhen").value.trim(), method: $("customActionMethod").value, path: $("customActionPath").value.trim(), risk: document.querySelector('input[name="actionKind"]:checked').value === "write" ? "High" : "Low", active: event.target.closest("#saveCustomAction") !== null, inputs: customInputs };
         var createdAction = await backend("POST", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions", customPayload);
         if (createdAction.http !== 201) { $("customActionNote").textContent = createdAction.body?.error?.message || "Could not save the action."; return; }
         actionRows.push({ id: createdAction.body.action.id, group:"Custom", name:createdAction.body.action.name, endpoint:createdAction.body.action.method + " " + createdAction.body.action.path, risk:createdAction.body.action.risk, usedBy:"—", status:createdAction.body.action.active ? "Enabled" : "Off", on:createdAction.body.action.active, custom:true });
@@ -2879,6 +2888,9 @@ details summary { margin-top: 4px; }
       document.querySelectorAll("#skillInsertItems [data-skill-token]").forEach(function (item) { item.hidden = query && item.textContent.toLowerCase().indexOf(query) === -1; });
     }
     if (event.target.id === "skillInstructions") renderSkillActionChips();
+  });
+  $("detailView").addEventListener("change", function (event) {
+    if (event.target.name === "actionKind") document.querySelectorAll(".custom-action-option").forEach(function (option) { option.classList.toggle("selected", option.contains(event.target) && event.target.checked); });
   });
 
   // Connection (Chattrn API) tab (devspec.txt screens list, "11d. Custom website: Connection (Chattrn API)").
