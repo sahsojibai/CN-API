@@ -944,6 +944,9 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/flow-tester")) {
         return serveFile(res, path.join(publicDir, "flow-tester.html"), "text/html; charset=utf-8");
       }
+      if (req.method === "GET" && url.pathname === "/widget") {
+        return serveFile(res, path.join(publicDir, "widget.html"), "text/html; charset=utf-8");
+      }
       if (req.method === "GET" && url.pathname === "/setup-flow.js") return serveFile(res, path.join(publicDir, "setup-flow.js"), "application/javascript; charset=utf-8");
       if (req.method === "GET" && url.pathname === "/openapi.yaml") {
         return serveFile(res, path.join(publicDir, "openapi.yaml"), "text/yaml; charset=utf-8");

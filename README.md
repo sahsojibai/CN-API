@@ -261,3 +261,7 @@ Set `CHATTRN_CATALOG_IMPORTS_ENABLED=false` and redeploy to disable the backgrou
 catalog worker, automatic imports after verification/activation, and manual sync requests.
 The dashboard and saved connections remain accessible. Catalog status reports `paused`;
 existing catalog data and job progress are retained. Set it to `true` and redeploy to resume.
+
+### Deterministic test widget
+
+Open `/widget` while signed in to the dashboard to exercise the saved runtime without an AI/NLP layer. Choose a connected store, start a session, search products, open details, add two items, change quantities, remove items, run available actions, and check out. This is an authenticated operator test harness, not a public customer widget.
