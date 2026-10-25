@@ -375,6 +375,31 @@ details summary { margin-top: 4px; }
 .action-toggle[aria-pressed="true"]::after { left:20px; }
 .action-help { color:var(--brand); background:transparent; border:0; font:600 12px/18px Inter,sans-serif; cursor:pointer; }
 @media (max-width:800px) { .action-stat-grid { grid-template-columns:repeat(2,1fr); } .action-toolbar .search-field { margin-left:0; width:100%; } }
+.custom-action-page { display:flex; flex-direction:column; gap:24px; }
+.custom-action-header h2 { margin:0 0 4px; font-size:22px; line-height:34px; color:var(--fg); }
+.custom-action-header p { margin:0; color:var(--muted); font-size:13px; line-height:20px; }
+.custom-action-card { padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
+.custom-action-section-title { display:flex; align-items:center; gap:10px; font-size:16px; line-height:24px; color:var(--fg); }
+.custom-action-step { display:grid; place-items:center; width:24px; height:24px; border-radius:12px; background:#e8dcf8; color:var(--brand); font-size:11px; font-weight:700; }
+.custom-action-help { margin:0; color:var(--muted); font-size:13px; line-height:20px; }
+.custom-action-field { display:flex; flex-direction:column; gap:4px; }
+.custom-action-field label { font-size:13px; line-height:20px; font-weight:500; color:var(--fg); }
+.custom-action-field input, .custom-action-field textarea, .custom-action-field select { width:100%; border:1px solid var(--line); border-radius:10px; padding:6px 12px; font:13px/20px Inter,sans-serif; color:var(--fg); background:var(--surface); }
+.custom-action-field textarea { min-height:104px; resize:vertical; }
+.custom-action-kind { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.custom-action-option { display:flex; gap:10px; padding:12px 14px; border:1px solid var(--line2); border-radius:8px; cursor:pointer; }
+.custom-action-option.selected { border:1.5px solid var(--brand); background:#fff; }
+.custom-action-option input { margin-top:3px; accent-color:var(--brand); }
+.custom-action-option strong { display:block; font-size:13px; line-height:20px; color:var(--fg); }
+.custom-action-option span { display:block; font-size:12px; line-height:18px; color:var(--muted); }
+.custom-action-request { display:grid; grid-template-columns:140px minmax(0,1fr); gap:12px; }
+.custom-action-inputs { border:1px solid var(--line2); border-radius:8px; overflow:auto; }
+.custom-action-inputs table { min-width:660px; }
+.custom-action-inputs th, .custom-action-inputs td { padding:10px 16px; border-bottom:1px solid var(--line2); font-size:12px; text-align:left; }
+.custom-action-inputs th { background:#f8f9fa; color:var(--muted); font-weight:500; }
+.custom-action-inputs tr:last-child td { border-bottom:0; }
+.custom-action-footer { display:flex; justify-content:flex-end; gap:8px; padding-top:4px; }
+@media (max-width:700px) { .custom-action-kind { grid-template-columns:1fr; } .custom-action-request { grid-template-columns:1fr; } .custom-action-card { padding:18px; } }
 /* ---- Connection-type choice and Chattrn API wizard ---- */
 .conn-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .conn-choice-card { display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; }
@@ -2465,6 +2490,8 @@ details summary { margin-top: 4px; }
   }
   function renderDetail(s) {
     detailStore = s;
+    if (Array.isArray(s.skills)) skillRows = s.skills.map(function (skill) { return Object.assign({}, skill, { actions: Array.isArray(skill.actions) ? skill.actions : [], active: skill.active === true }); });
+    if (Array.isArray(s.actions)) { actionRows = actionRows.filter(function (row) { return !row.custom; }).concat(s.actions.map(function (action) { return { id: action.id, group: "Custom", name: action.name, endpoint: action.method + " " + action.path, risk: action.risk || "Low", usedBy: "—", status: action.active ? "Enabled" : "Off", on: action.active, custom: true, trigger: action.trigger, inputs: action.inputs || [] }; })); }
     setCrumbStore(s.name);
     if (detailSection === "skills") { renderSkills(); return; }
     if (detailSection === "actions") { renderActions(); return; }
@@ -2533,6 +2560,20 @@ details summary { margin-top: 4px; }
     var cls = status === "Enabled" ? "b-pass" : status === "Failing" ? "b-fail" : status === "Needs setup" ? "b-warn" : "b-skip";
     return '<span class="badge ' + cls + '">' + esc(status) + '</span>';
   }
+  function renderCreateAction() {
+    if (!detailStore) return;
+    setCrumbStore((detailStore.name || "Store") + " › Actions › Create custom action");
+    $("detailBody").innerHTML = '<section class="custom-action-page" aria-labelledby="customActionHeading">' +
+      '<div class="custom-action-header"><h2 id="customActionHeading">Create custom action</h2><p>Let the AI Agent and your team call one more endpoint on your API, such as a warranty check or a return request.</p></div>' +
+      '<div class="card custom-action-card"><h3 class="custom-action-section-title"><span class="custom-action-step">1</span>What it does</h3>' +
+      '<div class="custom-action-field"><label for="customActionName">Name</label><input id="customActionName" value="Check warranty (IMEI)"></div>' +
+      '<div class="custom-action-field"><label for="customActionWhen">When should the AI use it?</label><textarea id="customActionWhen">The customer asks if their phone or gadget is still under warranty, or when the warranty ends.</textarea><p class="custom-action-help">The AI reads this to decide when to call the action. Be specific.</p></div>' +
+      '<div class="custom-action-field"><label>Does it change anything in your store?</label><div class="custom-action-kind"><label class="custom-action-option"><input type="radio" name="actionKind" value="write"><span><strong>Yes, it creates or changes something</strong><span>High risk. Customer must confirm first.</span></span></label><label class="custom-action-option selected"><input type="radio" name="actionKind" value="read" checked><span><strong>No, it only looks something up</strong><span>Low risk. Runs without asking.</span></span></label></div></div></div>' +
+      '<div class="card custom-action-card"><h3 class="custom-action-section-title"><span class="custom-action-step">2</span>API request</h3><p class="custom-action-help">Uses your store’s API key. Only paths on your connected API are allowed.</p><div class="custom-action-request"><div class="custom-action-field"><label for="customActionMethod">Method</label><select id="customActionMethod"><option>GET</option><option>POST</option><option>PATCH</option></select></div><div class="custom-action-field"><label for="customActionPath">Path</label><input id="customActionPath" value="/warranty"><p class="custom-action-help">Sent to your connected API</p></div></div></div>' +
+      '<div class="card custom-action-card"><h3 class="custom-action-section-title"><span class="custom-action-step">3</span>Inputs</h3><p class="custom-action-help">What the action sends, and where each value comes from.</p><div class="custom-action-inputs"><table><thead><tr><th>Name</th><th>Sent as</th><th>Value comes from</th><th>Check</th><th>Required</th></tr></thead><tbody><tr><td><input class="table-input" value="imei"></td><td>Query</td><td><select><option>Customer says</option><option>AI extracts</option></select></td><td><input type="checkbox" checked></td><td><input type="checkbox" checked></td></tr></tbody></table></div><button type="button" class="plain" id="addActionInput">＋ Add input</button></div>' +
+      '<div class="card custom-action-card"><h3 class="custom-action-section-title"><span class="custom-action-step">4</span>Test</h3><p class="custom-action-help">Run a read-only request to confirm the path and inputs work before making it available.</p><div class="custom-action-field"><label for="customActionTestValue">Test value</label><input id="customActionTestValue" placeholder="Enter an IMEI"></div><button type="button" class="btn-grey" id="testCustomAction">Test request</button><p class="skill-editor-note" id="customActionNote" role="status"></p></div>' +
+      '<div class="custom-action-footer"><button type="button" class="plain" id="cancelCustomAction">Cancel</button><button type="button" class="btn-grey" id="saveCustomActionOff">Save as Off</button><button type="button" class="primary" id="saveCustomAction">Save and enable</button></div></section>';
+  }
   function renderActions() {
     if (!detailStore) return;
     setCrumbStore(detailStore.name || "Store");
@@ -2587,7 +2628,7 @@ details summary { margin-top: 4px; }
     renderSkillRows("");
   }
 
-  function renderCreateSkill() {
+  function renderCreateSkill(existing) {
     if (!detailStore) return;
     setCrumbStore((detailStore.name || "Store") + " › Skills › Create Skill");
     $("detailBody").innerHTML =
@@ -2596,9 +2637,9 @@ details summary { margin-top: 4px; }
         '<div class="skill-editor-actions"><button type="button" class="icon-btn" id="deleteSkillDraft" aria-label="Delete skill"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button><button type="button" class="skill-test" id="testSkill"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 5l11 7-11 7z"/></svg>Test Skill</button><button type="button" class="skill-toggle" aria-label="Enable skill" aria-pressed="false" id="skillEnabled"></button></div></div>' +
         '<div class="skill-editor">' +
           '<main class="skill-editor-main">' +
-            '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="Order status &amp; tracking" autocomplete="off"></div>' +
-            '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="The customer asks where their order is, when it will arrive, or for a tracking link." autocomplete="off"></div>' +
-            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><textarea id="skillInstructions">1. Verify the customer\n\nIf the customer isn’t verified, THEN use action: Verify phone (OTP).\n\n2. Find the order\n\nIf the customer doesn’t mention an order number, THEN use their most recent order.\n\nUse action: Find orders then use action: Order details. If nothing is found, ask for the order number once, then hand off.\n\n3. Answer\n\n• IF Order: status = shipped, THEN share Shipment: courier and Shipment: tracking_url.\n• IF Order: status = processing AND Order: created_at is more than 3 days ago, THEN apologise and hand off to a human.\n• Always show the order card. Never guess a delivery date the store didn’t give.</textarea></div>' +
+            '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="' + esc(existing ? existing.name : "Order status & tracking") + '" autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="' + esc(existing ? existing.trigger : "The customer asks where their order is, when it will arrive, or for a tracking link.") + '" autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><textarea id="skillInstructions">' + esc(existing ? existing.instructions : "1. Verify the customer\n\nIf the customer isn’t verified, THEN use action: Verify phone (OTP).\n\n2. Find the order\n\nIf the customer doesn’t mention an order number, THEN use their most recent order.\n\nUse action: Find orders then use action: Order details. If nothing is found, ask for the order number once, then hand off.\n\n3. Answer\n\n• IF Order: status = shipped, THEN share Shipment: courier and Shipment: tracking_url.\n• IF Order: status = processing AND Order: created_at is more than 3 days ago, THEN apologise and hand off to a human.\n• Always show the order card. Never guess a delivery date the store didn’t give.") + '</textarea></div>' +
             '<div class="skill-section"><div><h4>Uses actions</h4><p class="skill-side-help">Filled in from your instructions. Edit the instructions to change it.</p></div><div class="skill-action-chips" id="skillActionChips"><span class="badge b-skip">Verify phone</span><span class="badge b-skip">Find orders</span><span class="badge b-skip">Order details</span></div></div>' +
           '</main>' +
           '<aside class="skill-editor-side">' +
@@ -2607,7 +2648,7 @@ details summary { margin-top: 4px; }
             '<div class="skill-section"><h4>Safety</h4><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Require a verified customer</strong><span>Always on when a Skill reads orders.</span></div><button type="button" class="skill-toggle" aria-label="Require a verified customer" aria-pressed="false"></button></div><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Confirm before changing anything</strong><span>The customer says yes before an action that changes an order.</span></div><button type="button" class="skill-toggle" aria-label="Confirm before changing anything" aria-pressed="true"></button></div><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Hand off if an action fails</strong><span>Passes the chat to your team with a summary.</span></div><button type="button" class="skill-toggle" aria-label="Hand off if an action fails" aria-pressed="true"></button></div></div>' +
           '</aside>' +
         '</div>' +
-        '<div class="skill-footer"><button type="button" class="plain" id="cancelSkill">Cancel</button><button type="button" class="primary" id="saveSkill">Save</button></div>' +
+        '<div class="skill-footer"><button type="button" class="plain" id="cancelSkill">Cancel</button><button type="button" class="primary" id="saveSkill" data-skill-id="' + esc(existing ? existing.id || "" : "") + '">Save</button></div>' +
         '<p class="skill-editor-note" id="skillEditorNote" role="status" style="padding:0 32px 12px"></p>' +
       '</div>';
   }
@@ -2625,20 +2666,44 @@ details summary { margin-top: 4px; }
     }
     target.innerHTML = rows.map(function (skill) {
       return '<tr><td>' + esc(skill.name) + '</td><td><div class="skill-actions">' + skill.actions.map(function (action) { return '<span class="badge b-skip">' + esc(action) + '</span>'; }).join("") + '</div></td>' +
-        '<td><span class="badge ' + (skill.draft ? 'b-info' : skill.active ? 'b-pass' : 'b-skip') + '">' + (skill.draft ? 'Draft' : skill.active ? 'Active' : 'Inactive') + '</span></td>' +
-        '<td class="skill-menu-cell"><button type="button" class="icon-btn" aria-label="Actions for ' + esc(skill.name) + '" data-skill-menu="' + esc(skill.name) + '">' + DOTS + '</button></td></tr>';
+        '<td><button type="button" class="badge ' + (skill.active ? 'b-pass' : 'b-skip') + '" data-skill-toggle="' + esc(skill.id || '') + '">' + (skill.active ? 'Enabled' : 'Off') + '</button></td>' +
+        '<td class="skill-menu-cell"><button type="button" class="icon-btn" aria-label="Actions for ' + esc(skill.name) + '" data-skill-menu="' + esc(skill.name) + '" data-skill-id="' + esc(skill.id || '') + '">' + DOTS + '</button></td></tr>';
     }).join("");
   }
 
-  $("detailView").addEventListener("click", function (event) {
+  $("detailView").addEventListener("click", async function (event) {
     var nav = event.target.closest ? event.target.closest("[data-detail-section]") : null;
     if (nav) { setDetailSection(nav.getAttribute("data-detail-section")); return; }
     var filter = event.target.closest ? event.target.closest("[data-action-filter]") : null;
     if (filter) { actionFilter = filter.getAttribute("data-action-filter"); renderActions(); return; }
+    if (event.target.closest && event.target.closest("#createCustomAction")) { renderCreateAction(); return; }
+    if (event.target.closest && event.target.closest("#cancelCustomAction")) { setDetailSection("actions"); return; }
+    if (event.target.closest && event.target.closest("#testCustomAction")) {
+      var testPath = $("customActionPath").value.trim(), testMethod = $("customActionMethod").value;
+      var existingAction = actionRows.find(function (row) { return row.custom && row.endpoint === testMethod + " " + testPath; });
+      if (existingAction && existingAction.id) {
+        var tested = await backend("POST", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions/" + encodeURIComponent(existingAction.id) + "/test", { values: { imei: $("customActionTestValue").value.trim() } });
+        $("customActionNote").textContent = tested.http === 200 ? (tested.body.ok ? "Request succeeded (HTTP " + tested.body.http + ")." : "The endpoint returned HTTP " + tested.body.http + ".") : "Could not test the action.";
+      } else $("customActionNote").textContent = "Save the action first, then test it against the connected API.";
+      return;
+    }
+    if (event.target.closest && event.target.closest("#addActionInput")) { $("customActionNote").textContent = "Add input rows will be connected to action configuration next."; return; }
+    if (event.target.closest && event.target.closest("#saveCustomAction, #saveCustomActionOff")) {
+      var customName = $("customActionName").value.trim() || "Custom action";
+      var custom = actionRows.find(function (r) { return r.name === customName; });
+      if (custom) { custom.on = event.target.closest("#saveCustomAction") !== null; custom.status = custom.on ? "Enabled" : "Off"; if (custom.id) { var updatedAction = await backend("PUT", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions/" + encodeURIComponent(custom.id), { active: custom.on }); if (updatedAction.http !== 200) { $("customActionNote").textContent = "Could not update the action."; return; } } }
+      else {
+        var customPayload = { name: customName, trigger: $("customActionWhen").value.trim(), method: $("customActionMethod").value, path: $("customActionPath").value.trim(), risk: document.querySelector('input[name="actionKind"]:checked').value === "write" ? "High" : "Low", active: event.target.closest("#saveCustomAction") !== null, inputs: [{ name: "imei", sent_as: "query", required: true }] };
+        var createdAction = await backend("POST", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions", customPayload);
+        if (createdAction.http !== 201) { $("customActionNote").textContent = createdAction.body?.error?.message || "Could not save the action."; return; }
+        actionRows.push({ id: createdAction.body.action.id, group:"Custom", name:createdAction.body.action.name, endpoint:createdAction.body.action.method + " " + createdAction.body.action.path, risk:createdAction.body.action.risk, usedBy:"—", status:createdAction.body.action.active ? "Enabled" : "Off", on:createdAction.body.action.active, custom:true });
+      }
+      setDetailSection("actions"); $("actionNote").textContent = customName + " saved."; return;
+    }
     var actionToggle = event.target.closest ? event.target.closest("[data-action-toggle]") : null;
     if (actionToggle) {
       var action = actionRows.find(function (r) { return r.name === actionToggle.getAttribute("data-action-toggle"); });
-      if (action && !action.failing) { action.on = !action.on; action.status = action.on ? "Enabled" : "Off"; renderActions(); }
+      if (action && !action.failing) { action.on = !action.on; action.status = action.on ? "Enabled" : "Off"; if (action.custom && action.id) { var ar = await backend("PUT", "/api/stores/" + encodeURIComponent(detailStore.id) + "/actions/" + encodeURIComponent(action.id), { active: action.on }); if (ar.http !== 200) { action.on = !action.on; action.status = action.on ? "Enabled" : "Off"; } } renderActions(); }
       else if (action) { $("actionNote").textContent = "Order details is temporarily disabled while its endpoint is failing."; }
       return;
     }
@@ -2662,6 +2727,23 @@ details summary { margin-top: 4px; }
       $("skillCreateNote").textContent = "Choose Create Skill to open the editor.";
       return;
     }
+    var skillToggle = event.target.closest ? event.target.closest("[data-skill-toggle]") : null;
+    if (skillToggle) {
+      var toggled = skillRows.find(function (row) { return row.id === skillToggle.getAttribute("data-skill-toggle"); });
+      if (toggled) {
+        var tr = await backend("PUT", "/api/stores/" + encodeURIComponent(detailStore.id) + "/skills/" + encodeURIComponent(toggled.id), { active: !toggled.active });
+        if (tr.http === 200) { toggled.active = tr.body.skill.active; renderSkillRows($("skillSearch")?.value || ""); }
+      }
+      return;
+    }
+    if (event.target.closest && event.target.closest("#deleteSkillDraft")) {
+      var deleteId = $("saveSkill")?.getAttribute("data-skill-id");
+      if (deleteId && confirm("Delete this skill?")) {
+        var dr = await backend("DELETE", "/api/stores/" + encodeURIComponent(detailStore.id) + "/skills/" + encodeURIComponent(deleteId), {});
+        if (dr.http === 200) { skillRows = skillRows.filter(function (row) { return row.id !== deleteId; }); setDetailSection("skills"); }
+      } else if (!deleteId) setDetailSection("skills");
+      return;
+    }
     if (event.target.closest && event.target.closest("#cancelSkill, #deleteSkillDraft")) {
       setDetailSection("skills");
       return;
@@ -2672,18 +2754,31 @@ details summary { margin-top: 4px; }
       var instructions = $("skillInstructions").value.trim();
       var note = $("skillEditorNote");
       if (!name || !trigger || !instructions) { if (note) note.textContent = "Name, trigger, and instructions are required."; return; }
-      skillRows = skillRows.filter(function (row) { return row.name !== name; });
-      skillRows.unshift({ name: name, actions: ["Verify phone", "Find orders", "Order details"], active: $("skillEnabled").getAttribute("aria-pressed") === "true", draft: true, trigger: trigger, instructions: instructions });
+      var saveButton = event.target.closest("#saveSkill");
+      var payload = { name: name, trigger: trigger, instructions: instructions, actions: ["Verify phone", "Find orders", "Order details"], active: $("skillEnabled").getAttribute("aria-pressed") === "true" };
+      var skillId = saveButton.getAttribute("data-skill-id");
+      var response = await backend(skillId ? "PUT" : "POST", "/api/stores/" + encodeURIComponent(detailStore.id) + "/skills" + (skillId ? "/" + encodeURIComponent(skillId) : ""), payload);
+      if (response.http !== 200 && response.http !== 201) { if (note) note.textContent = response.body?.error?.message || "Could not save the skill."; return; }
+      var savedSkill = response.body.skill;
+      skillRows = skillRows.filter(function (row) { return row.id !== savedSkill.id; });
+      skillRows.unshift(savedSkill);
       setDetailSection("skills");
-      $("skillCreateNote").textContent = name + " saved as a draft.";
+      $("skillCreateNote").textContent = name + " saved.";
       return;
     }
     var toggle = event.target.closest ? event.target.closest(".skill-toggle") : null;
     if (toggle) { toggle.setAttribute("aria-pressed", toggle.getAttribute("aria-pressed") === "true" ? "false" : "true"); return; }
-    if (event.target.closest && event.target.closest("#testSkill")) { $("skillEditorNote").textContent = "Skill test will run after actions and agent connections are available."; return; }
+    if (event.target.closest && event.target.closest("#testSkill")) {
+      var testName = $("skillName").value.trim(), testTrigger = $("skillTrigger").value.trim(), testInstructions = $("skillInstructions").value.trim();
+      $("skillEditorNote").textContent = testName && testTrigger && testInstructions ? "Skill is valid. It will use the linked actions when attached to an AI Agent." : "Add a name, trigger, and instructions before testing.";
+      return;
+    }
     if (event.target.closest && event.target.closest("#addKnowledge")) { $("skillEditorNote").textContent = "Knowledge selection will be connected to your store knowledge base next."; return; }
     var menu = event.target.closest ? event.target.closest("[data-skill-menu]") : null;
-    if (menu) $("skillCreateNote").textContent = menu.getAttribute("data-skill-menu") + " actions will be available when skill management is connected.";
+    if (menu) {
+      var menuSkill = skillRows.find(function (row) { return row.id === menu.getAttribute("data-skill-id") || row.name === menu.getAttribute("data-skill-menu"); });
+      if (menuSkill && confirm("Edit " + menuSkill.name + "?")) renderCreateSkill(menuSkill);
+    }
   });
   $("detailView").addEventListener("input", function (event) {
     if (event.target.id === "skillSearch") renderSkillRows(event.target.value);

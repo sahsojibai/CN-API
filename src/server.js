@@ -17,6 +17,7 @@ const { catalogFor, beginSync, syncStatus, neutralProduct } = require("./catalog
 const { createCatalogJobs } = require("./catalog-jobs");
 const { lookupProducts } = require("./product-lookup");
 const CC = require("./chattrn-connector");
+const SC = require("./store-client");
 const { runChattrnTests } = require("./chattrn-test-runner");
 const { sniffFramework } = require("./framework-sniff");
 const LT = require("./laravel-token");
@@ -187,6 +188,94 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
   });
 
   route("GET", "/api/stores/:id", async ({ params }) => ({ body: publicView(await findStore(params.id)) }));
+
+  // Store-scoped Skills are configuration, not catalog data. Keep them in the store document so
+  // they survive restarts and work identically with JSON and PostgreSQL storage.
+  route("GET", "/api/stores/:id/skills", async ({ params }) => {
+    const store = await findStore(params.id);
+    return { body: { skills: Array.isArray(store.skills) ? store.skills : [] } };
+  });
+  route("POST", "/api/stores/:id/skills", async ({ params, body }) => {
+    const store = await findStore(params.id);
+    const name = String(body.name || "").trim();
+    const trigger = String(body.trigger || "").trim();
+    const instructions = String(body.instructions || "").trim();
+    if (!name || name.length > 120) throw new HttpError(422, "skill_name_required", "Enter a skill name (up to 120 characters).");
+    if (!trigger || trigger.length > 1000) throw new HttpError(422, "skill_trigger_required", "Describe when the AI should use this skill.");
+    if (!instructions || instructions.length > 20000) throw new HttpError(422, "skill_instructions_required", "Add the skill instructions (up to 20,000 characters).");
+    const skills = Array.isArray(store.skills) ? store.skills : [];
+    if (skills.some(skill => skill.name.toLowerCase() === name.toLowerCase())) throw new HttpError(409, "skill_exists", "A skill with this name already exists.");
+    const skill = { id: randomUUID(), name, trigger, instructions, actions: Array.isArray(body.actions) ? body.actions.map(String).slice(0, 30) : [], knowledge: Array.isArray(body.knowledge) ? body.knowledge.map(String).slice(0, 30) : [], safety: body.safety && typeof body.safety === "object" ? body.safety : {}, active: body.active === true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    store.skills = skills.concat(skill);
+    await db.put(store);
+    return { status: 201, body: { skill } };
+  });
+  route("PUT", "/api/stores/:id/skills/:skillId", async ({ params, body }) => {
+    const store = await findStore(params.id);
+    const skills = Array.isArray(store.skills) ? store.skills : [];
+    const index = skills.findIndex(skill => skill.id === params.skillId);
+    if (index < 0) throw new HttpError(404, "skill_not_found", "No skill with that id.");
+    const current = skills[index];
+    const next = { ...current };
+    for (const key of ["name", "trigger", "instructions"]) if (body[key] !== undefined) next[key] = String(body[key]).trim();
+    if (!next.name || !next.trigger || !next.instructions) throw new HttpError(422, "skill_fields_required", "Name, trigger, and instructions are required.");
+    if (skills.some((skill, i) => i !== index && skill.name.toLowerCase() === next.name.toLowerCase())) throw new HttpError(409, "skill_exists", "A skill with this name already exists.");
+    if (body.actions !== undefined) next.actions = Array.isArray(body.actions) ? body.actions.map(String).slice(0, 30) : [];
+    if (body.knowledge !== undefined) next.knowledge = Array.isArray(body.knowledge) ? body.knowledge.map(String).slice(0, 30) : [];
+    if (body.safety !== undefined) next.safety = body.safety && typeof body.safety === "object" ? body.safety : {};
+    if (body.active !== undefined) next.active = body.active === true;
+    next.updated_at = new Date().toISOString(); skills[index] = next; store.skills = skills;
+    await db.put(store);
+    return { body: { skill: next } };
+  });
+  route("DELETE", "/api/stores/:id/skills/:skillId", async ({ params }) => {
+    const store = await findStore(params.id);
+    const skills = Array.isArray(store.skills) ? store.skills : [];
+    if (!skills.some(skill => skill.id === params.skillId)) throw new HttpError(404, "skill_not_found", "No skill with that id.");
+    store.skills = skills.filter(skill => skill.id !== params.skillId);
+    await db.put(store);
+    return { body: { ok: true } };
+  });
+
+  route("GET", "/api/stores/:id/actions", async ({ params }) => {
+    const store = await findStore(params.id);
+    return { body: { actions: Array.isArray(store.actions) ? store.actions : [] } };
+  });
+  route("POST", "/api/stores/:id/actions", async ({ params, body }) => {
+    const store = await findStore(params.id);
+    const name = String(body.name || "").trim(), method = String(body.method || "GET").toUpperCase(), apiPath = String(body.path || "").trim();
+    if (!name || name.length > 120) throw new HttpError(422, "action_name_required", "Enter an action name.");
+    if (!["GET", "POST", "PATCH"].includes(method)) throw new HttpError(422, "action_method", "Only GET, POST, and PATCH actions are supported.");
+    if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]+$/.test(apiPath) || apiPath.includes("//") || apiPath.includes("#")) throw new HttpError(422, "action_path", "Enter a safe path on the connected API.");
+    const actions = Array.isArray(store.actions) ? store.actions : [];
+    if (actions.some(action => action.name.toLowerCase() === name.toLowerCase())) throw new HttpError(409, "action_exists", "An action with this name already exists.");
+    const action = { id: randomUUID(), name, method, path: apiPath, trigger: String(body.trigger || "").trim(), risk: body.risk === "High" ? "High" : body.risk === "Medium" ? "Medium" : "Low", inputs: Array.isArray(body.inputs) ? body.inputs.slice(0, 30) : [], active: body.active === true, custom: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    store.actions = actions.concat(action); await db.put(store); return { status: 201, body: { action } };
+  });
+  route("PUT", "/api/stores/:id/actions/:actionId", async ({ params, body }) => {
+    const store = await findStore(params.id), actions = Array.isArray(store.actions) ? store.actions : [], index = actions.findIndex(action => action.id === params.actionId);
+    if (index < 0) throw new HttpError(404, "action_not_found", "No custom action with that id.");
+    const action = { ...actions[index] };
+    if (body.active !== undefined) action.active = body.active === true;
+    if (body.name !== undefined) action.name = String(body.name).trim();
+    action.updated_at = new Date().toISOString(); actions[index] = action; store.actions = actions; await db.put(store); return { body: { action } };
+  });
+  route("DELETE", "/api/stores/:id/actions/:actionId", async ({ params }) => {
+    const store = await findStore(params.id), actions = Array.isArray(store.actions) ? store.actions : [];
+    if (!actions.some(action => action.id === params.actionId)) throw new HttpError(404, "action_not_found", "No custom action with that id.");
+    store.actions = actions.filter(action => action.id !== params.actionId); await db.put(store); return { body: { ok: true } };
+  });
+  route("POST", "/api/stores/:id/actions/:actionId/test", async ({ params, body }) => {
+    const store = await findStore(params.id), action = (Array.isArray(store.actions) ? store.actions : []).find(item => item.id === params.actionId);
+    if (!action) throw new HttpError(404, "action_not_found", "No custom action with that id.");
+    const values = body && body.values && typeof body.values === "object" ? body.values : {};
+    const query = new URLSearchParams(); Object.entries(values).forEach(([key, value]) => { if (value !== undefined && value !== null && String(value) !== "") query.set(key, String(value)); });
+    const requestPath = action.path + (query.toString() ? "?" + query.toString() : "");
+    const response = store.connection_type === "chattrn_api" || store.connection_type === "laravel_package"
+      ? await CL.call(ctx, store, { path: requestPath, method: action.method, body: action.method === "GET" ? undefined : values })
+      : await SC.call(ctx, store, { path: requestPath, method: action.method, body: action.method === "GET" ? undefined : values });
+    return { status: 200, body: { ok: response.http >= 200 && response.http < 300, http: response.http, response: response.json || response.text || null } };
+  });
 
   // Replace key: the new key is tested first. If it fails, the old key keeps working.
   route("PUT", "/api/stores/:id/auth", async ({ params, body }) => {
