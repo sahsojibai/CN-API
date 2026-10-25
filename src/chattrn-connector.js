@@ -25,9 +25,9 @@ function toVariant(v) {
   return {
     id: v.id != null ? String(v.id) : null,
     title: v.title || null,
-    price: M.toMoney(v.price),
+    price: M.toMoney(v.price != null ? v.price : v.sellPrice),
     compare_at_price: v.compare_at_price != null ? M.toMoney(v.compare_at_price) : null,
-    stock: M.toNumber(v.inventory_quantity),
+    stock: M.toNumber(v.inventory_quantity != null ? v.inventory_quantity : v.stock),
     sku: v.sku || null,
     inventory_item_id: v.inventory_item_id != null ? String(v.inventory_item_id) : null,
   };

@@ -2733,6 +2733,18 @@ details summary { margin-top: 4px; }
   }
   function skillMappedFields() {
     var fields = [], mapping = detailStore && detailStore.mapping;
+    // Native Chattrn API connections do not have a user-editable mapping.
+    // Their canonical Shopify-shaped response still exposes these fields to
+    // Skills, so do not fall back to the smaller mapped-API list here.
+    if (detailStore && detailStore.connection_type === "chattrn_api") {
+      return [
+        "Product: id", "Product: title", "Product: description", "Product: price",
+        "Product: compare_at_price", "Product: currency", "Product: stock", "Product: images",
+        "Product: variants", "Product: vendor", "Product: updated_at",
+        "Variant: id", "Variant: title", "Variant: price", "Variant: compare_at_price",
+        "Variant: stock", "Variant: sku"
+      ];
+    }
     Object.keys(mapping || {}).forEach(function (resource) {
       var config = mapping[resource] || {}, version = (config.versions || []).find(function (item) { return item.version === config.current; }) || config;
       (version.rows || config.rows || []).forEach(function (row) {
@@ -3376,6 +3388,7 @@ details summary { margin-top: 4px; }
     $("cBase").value = (s.chattrn && s.chattrn.base_url) || "";
     $("cToken").value = "";
     cState.storeId = s.id;
+    cState.capabilities = (s.chattrn && s.chattrn.capabilities) || {};
   }
 
   // ---- Laravel package wizard (slice 3: Connect -> Map your tables -> Verify) ----

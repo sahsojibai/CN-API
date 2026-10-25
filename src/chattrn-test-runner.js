@@ -250,10 +250,13 @@ async function runChattrnTests(ctx, store, input = {}) {
 
   const sampleProducts = pickSamples(sample);
   const fields = [
+    { label: "Product ID", chattrn: "product.id", state: sample.length && sample.every((p) => p.id != null) ? "matched" : "missing" },
     { label: "Title", chattrn: "product.title", state: sample.length && sample.every((p) => p.title) ? "matched" : "missing" },
     { label: "Selling price", chattrn: "variant.price", state: sample.length && sample.every((p) => p.price != null) ? "matched" : "missing" },
     { label: "Was price", chattrn: "variant.compare_at_price", state: sample.some((p) => p.compare_at_price) ? "matched" : "optional" },
     { label: "Variants and options", chattrn: "product.variants", state: sample.length && sample.every((p) => p.variants.length) ? "matched" : "missing" },
+    { label: "Variant ID", chattrn: "variant.id", state: sample.some((p) => p.variants.some((v) => !v.default)) && sample.filter((p) => p.variants.some((v) => !v.default)).every((p) => p.variants.filter((v) => !v.default).every((v) => v.id != null)) ? "matched" : "optional" },
+    { label: "Variant price", chattrn: "variant.price", state: sample.some((p) => p.variants.some((v) => !v.default)) && sample.filter((p) => p.variants.some((v) => !v.default)).every((p) => p.variants.filter((v) => !v.default).every((v) => v.price != null)) ? "matched" : "optional" },
     { label: "Stock per variant", chattrn: "variant.inventory_quantity", state: sample.some((p) => p.stock == null) ? "check_this" : "matched" },
     { label: "Images", chattrn: "product.images", state: sample.some((p) => p.images.length) ? "matched" : "optional" },
     { label: "Brand", chattrn: "product.vendor", state: sample.some((p) => p.vendor) ? "matched" : "optional" },
