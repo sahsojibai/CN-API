@@ -338,6 +338,19 @@ details summary { margin-top: 4px; }
 .skill-toggle[aria-pressed="true"]::after { left: 22px; }
 .skill-footer { display: flex; justify-content: center; gap: 12px; padding: 16px 32px; border-top: 1px solid var(--line2); }
 .skill-editor-note { min-height: 18px; color: var(--muted); }
+.skill-name-link, .action-name-link { border:0; padding:0; background:none; color:var(--fg-strong); font:inherit; font-weight:600; text-align:left; cursor:pointer; }
+.skill-name-link:hover, .action-name-link:hover { color:var(--brand); text-decoration:underline; }
+.skill-row-menu { position:relative; display:inline-block; }
+.skill-row-menu-popover { position:absolute; right:0; top:24px; z-index:8; min-width:110px; padding:4px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:0 8px 24px rgba(0,0,0,.12); }
+.skill-row-menu-popover button { display:block; width:100%; border:0; background:transparent; padding:7px 9px; border-radius:6px; color:var(--fg); text-align:left; cursor:pointer; }
+.skill-row-menu-popover button:hover { background:var(--field); }
+.skill-row-menu-popover .danger { color:var(--fail); }
+.action-detail { display:flex; flex-direction:column; gap:16px; }
+.action-detail-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.action-detail-header h2 { margin:0; color:var(--fg); }
+.action-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.action-detail-item { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+.action-detail-item strong { display:block; color:var(--muted); font-size:12px; margin-bottom:4px; }
 .skill-instructions-wrap { position:relative; }
 .skill-instructions-editor { min-height:310px; border:1.5px solid var(--brand); border-radius:10px; padding:14px 12px; font:13px/22px Inter,sans-serif; color:var(--fg-strong); white-space:pre-wrap; outline:0; }
 .skill-instructions-editor:empty::before { content:attr(data-placeholder); color:var(--muted2); }
@@ -2472,7 +2485,6 @@ details summary { margin-top: 4px; }
     { group:"Orders", name:"Order details", endpoint:"GET /orders/{number}", risk:"Medium", usedBy:"Order status & tracking", status:"Failing", on:true, failing:true },
     { group:"Orders", name:"Cancel order", endpoint:"POST /orders/{number}/cancel", risk:"High", usedBy:"—", status:"Not supported", on:false, unsupported:true },
     { group:"Orders", name:"Update address", endpoint:"PATCH /orders/{number}", risk:"High", usedBy:"—", status:"Not supported", on:false, unsupported:true },
-    { group:"Custom", name:"Check warranty (IMEI)", endpoint:"GET /warranty?imei=", risk:"Low", usedBy:"Warranty check", status:"Enabled", on:true, custom:true }
   ];
   function hostOf(u) { return String(u || "").replace(/^https?:\/\//, "").replace(/\/$/, ""); }
   function kv(label, valueHtml) {
@@ -2615,9 +2627,13 @@ details summary { margin-top: 4px; }
       return '<section class="action-group"><h3>' + esc(group) + '</h3><div class="action-table"><div class="action-table-head"><span>Action</span><span>Risk</span><span>Used by Skills</span><span>Status</span><span>On</span></div>' + rows.filter(function (r) { return r.group === group; }).map(function (r) {
         var risk = r.risk === "High" ? "b-fail" : r.risk === "Medium" ? "b-warn" : "b-skip";
         var control = r.setup ? '<button type="button" class="action-help" data-action-help="' + esc(r.name) + '">How to add</button>' : r.unsupported ? '<button type="button" class="action-help" data-action-help="' + esc(r.name) + '">Why?</button>' : '<button type="button" class="action-toggle" aria-label="Toggle ' + esc(r.name) + '" aria-pressed="' + (r.on ? 'true' : 'false') + '" data-action-toggle="' + esc(r.name) + '"></button>';
-        return '<div class="action-row ' + (r.failing ? 'failing' : '') + '"><div><span class="action-name">' + esc(r.name) + '</span><span class="action-endpoint">' + esc(r.endpoint) + '</span></div><span class="badge ' + risk + '">' + esc(r.risk) + '</span><span class="action-cell-muted">' + esc(r.usedBy) + '</span><span>' + actionBadge(r.status) + '</span><span>' + control + '</span></div>';
+        return '<div class="action-row ' + (r.failing ? 'failing' : '') + '"><div><button type="button" class="action-name-link" data-action-detail="' + esc(r.name) + '">' + esc(r.name) + '</button><span class="action-endpoint">' + esc(r.endpoint) + '</span></div><span class="badge ' + risk + '">' + esc(r.risk) + '</span><span class="action-cell-muted">' + esc(r.usedBy) + '</span><span>' + actionBadge(r.status) + '</span><span>' + control + '</span></div>';
       }).join("") + '</div></section>';
     }).join("") || '<div class="card"><p class="hint">No actions match your search.</p></div>';
+  }
+  function renderActionDetail(action) {
+    if (!action) return;
+    $("detailBody").innerHTML = '<section class="action-detail"><div class="action-detail-header"><div><button type="button" class="plain" id="backToActions">← Actions</button><h2>' + esc(action.name) + '</h2></div><span>' + actionBadge(action.status) + '</span></div><div class="card"><div class="action-detail-grid"><div class="action-detail-item"><strong>Endpoint</strong>' + esc(action.endpoint || "—") + '</div><div class="action-detail-item"><strong>Risk</strong>' + esc(action.risk || "—") + '</div><div class="action-detail-item"><strong>Used by Skills</strong>' + esc(action.usedBy || "—") + '</div><div class="action-detail-item"><strong>Type</strong>' + (action.custom ? "Custom action" : "Standard action") + '</div></div><p class="hint">This action is available to Skills according to its status and configuration.</p></div></section>';
   }
 
   function renderSkills() {
@@ -2646,9 +2662,9 @@ details summary { margin-top: 4px; }
         '<div class="skill-editor-actions"><button type="button" class="icon-btn" id="deleteSkillDraft" aria-label="Delete skill"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button><button type="button" class="skill-test" id="testSkill"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 5l11 7-11 7z"/></svg>Test Skill</button><button type="button" class="skill-toggle" aria-label="Enable skill" aria-pressed="false" id="skillEnabled"></button></div></div>' +
         '<div class="skill-editor">' +
           '<main class="skill-editor-main">' +
-            '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="' + esc(existing ? existing.name : "") + '" placeholder="e.g. Order status & tracking" autocomplete="off"></div>' +
-            '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="' + esc(existing ? existing.trigger : "") + '" placeholder="Describe the customer question or intent" autocomplete="off"></div>' +
-            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><div class="skill-instructions-wrap"><div id="skillInstructions" class="skill-instructions-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Tell the AI what to do, step by step.">' + esc(existing ? existing.instructions : "") + '</div><div class="skill-insert-bar"><button type="button" class="skill-insert" id="insertSkillAction">⚡ Action</button><button type="button" class="skill-insert" id="insertSkillField">{} Field</button></div><div id="skillInsertMenu" class="skill-insert-menu" hidden></div></div></div>' +
+            '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="' + esc(existing && existing.name || "") + '" placeholder="e.g. Order status & tracking" autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="' + esc(existing && existing.trigger || "") + '" placeholder="Describe the customer question or intent" autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><div class="skill-instructions-wrap"><div id="skillInstructions" class="skill-instructions-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Tell the AI what to do, step by step.">' + esc(existing && existing.instructions || "") + '</div><div class="skill-insert-bar"><button type="button" class="skill-insert" id="insertSkillAction">⚡ Action</button><button type="button" class="skill-insert" id="insertSkillField">{} Field</button></div><div id="skillInsertMenu" class="skill-insert-menu" hidden></div></div></div>' +
             '<div class="skill-section"><div><h4>Uses actions</h4><p class="skill-side-help">Filled in from your instructions. Edit the instructions to change it.</p></div><div class="skill-action-chips" id="skillActionChips"></div></div>' +
           '</main>' +
           '<aside class="skill-editor-side">' +
@@ -2721,15 +2737,20 @@ details summary { margin-top: 4px; }
       return;
     }
     target.innerHTML = rows.map(function (skill) {
-      return '<tr><td>' + esc(skill.name) + '</td><td><div class="skill-actions">' + skill.actions.map(function (action) { return '<span class="badge b-skip">' + esc(action) + '</span>'; }).join("") + '</div></td>' +
+      return '<tr><td><button type="button" class="skill-name-link" data-skill-detail="' + esc(skill.id || skill.name) + '">' + esc(skill.name) + '</button></td><td><div class="skill-actions">' + skill.actions.map(function (action) { return '<span class="badge b-skip">' + esc(action) + '</span>'; }).join("") + '</div></td>' +
         '<td><button type="button" class="badge ' + (skill.active ? 'b-pass' : 'b-skip') + '" data-skill-toggle="' + esc(skill.id || '') + '">' + (skill.active ? 'Enabled' : 'Off') + '</button></td>' +
-        '<td class="skill-menu-cell"><button type="button" class="icon-btn" aria-label="Actions for ' + esc(skill.name) + '" data-skill-menu="' + esc(skill.name) + '" data-skill-id="' + esc(skill.id || '') + '">' + DOTS + '</button></td></tr>';
+        '<td class="skill-menu-cell"><span class="skill-row-menu"><button type="button" class="icon-btn" aria-label="Actions for ' + esc(skill.name) + '" data-skill-menu="' + esc(skill.name) + '" data-skill-id="' + esc(skill.id || '') + '">' + DOTS + '</button><span class="skill-row-menu-popover" data-skill-popover="' + esc(skill.id || skill.name) + '" hidden><button type="button" data-skill-edit="' + esc(skill.id || skill.name) + '">Edit</button><button type="button" class="danger" data-skill-delete="' + esc(skill.id || skill.name) + '">Remove</button></span></span></td></tr>';
     }).join("");
   }
 
   $("detailView").addEventListener("click", async function (event) {
+    var insertMenu = $("skillInsertMenu");
+    if (insertMenu && !insertMenu.hidden && !event.target.closest("#skillInsertMenu, #insertSkillAction, #insertSkillField")) insertMenu.hidden = true;
     var nav = event.target.closest ? event.target.closest("[data-detail-section]") : null;
     if (nav) { setDetailSection(nav.getAttribute("data-detail-section")); return; }
+    var actionDetail = event.target.closest ? event.target.closest("[data-action-detail]") : null;
+    if (actionDetail) { renderActionDetail(actionRows.find(function (row) { return row.name === actionDetail.getAttribute("data-action-detail"); })); return; }
+    if (event.target.closest && event.target.closest("#backToActions")) { renderActions(); return; }
     var filter = event.target.closest ? event.target.closest("[data-action-filter]") : null;
     if (filter) { actionFilter = filter.getAttribute("data-action-filter"); renderActions(); return; }
     if (event.target.closest && event.target.closest("#createCustomAction")) { renderCreateAction(); return; }
@@ -2837,8 +2858,17 @@ details summary { margin-top: 4px; }
     if (event.target.closest && event.target.closest("#addKnowledge")) { $("skillEditorNote").textContent = "Knowledge selection will be connected to your store knowledge base next."; return; }
     var menu = event.target.closest ? event.target.closest("[data-skill-menu]") : null;
     if (menu) {
-      var menuSkill = skillRows.find(function (row) { return row.id === menu.getAttribute("data-skill-id") || row.name === menu.getAttribute("data-skill-menu"); });
-      if (menuSkill && confirm("Edit " + menuSkill.name + "?")) renderCreateSkill(menuSkill);
+      var popover = menu.parentElement && menu.parentElement.querySelector("[data-skill-popover]");
+      if (popover) popover.hidden = !popover.hidden;
+      return;
+    }
+    var skillEdit = event.target.closest ? event.target.closest("[data-skill-edit]") : null;
+    if (skillEdit) { var editSkill = skillRows.find(function (row) { return (row.id || row.name) === skillEdit.getAttribute("data-skill-edit"); }); if (editSkill) renderCreateSkill(editSkill); return; }
+    var skillDelete = event.target.closest ? event.target.closest("[data-skill-delete]") : null;
+    if (skillDelete) {
+      var removeSkill = skillRows.find(function (row) { return (row.id || row.name) === skillDelete.getAttribute("data-skill-delete"); });
+      if (removeSkill && confirm("Remove " + removeSkill.name + "?")) { var removed = removeSkill.id ? await backend("DELETE", "/api/stores/" + encodeURIComponent(detailStore.id) + "/skills/" + encodeURIComponent(removeSkill.id), {}) : { http: 200 }; if (removed.http === 200) { skillRows = skillRows.filter(function (row) { return row.id !== removeSkill.id && row.name !== removeSkill.name; }); renderSkills(); } }
+      return;
     }
   });
   $("detailView").addEventListener("input", function (event) {
