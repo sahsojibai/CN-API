@@ -265,7 +265,8 @@ details summary { margin-top: 4px; }
 .store-link:hover { color: var(--brand); text-decoration: underline; }
 .detail-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: start; }
 .subnav { display: flex; flex-direction: column; gap: 4px; }
-.subnav-item { display: flex; align-items: center; min-height: 36px; padding: 8px; border-radius: 10px; font-size: 13px; line-height: 20px; color: var(--muted); }
+.subnav-item { display: flex; align-items: center; min-height: 36px; width: 100%; padding: 8px; border: 0; background: transparent; border-radius: 10px; font: 400 13px/20px Inter, sans-serif; text-align: left; color: var(--muted); cursor: pointer; }
+.subnav-item:hover { background: rgba(241,244,245,.65); color: var(--fg-strong); }
 .subnav-item.on { background: var(--bg); color: var(--fg-strong); font-weight: 600; }
 .detail-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card-title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--fg); }
@@ -278,7 +279,102 @@ details summary { margin-top: 4px; }
 .detail-actions { display: flex; gap: 8px; padding-top: 8px; flex-wrap: wrap; }
 .btn-grey { background: var(--chip-bg); color: var(--fg); border: 0; border-radius: 8px; height: 28px; padding: 0 10px; font: 500 13px/16px Inter, sans-serif; cursor: pointer; }
 .btn-red { background: var(--fail); color: #fff; border: 0; border-radius: 8px; height: 28px; padding: 0 10px; font: 500 13px/16px Inter, sans-serif; cursor: pointer; }
+
+/* ---- Store skills (Figma 33930:23575) ---- */
+.skills-page { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.skills-intro { color: var(--fg); font-size: 12px; line-height: 18px; }
+.skills-learn { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.skills-learn svg { flex: none; }
+.skills-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.skills-create { display: inline-flex; align-items: stretch; height: 32px; border-radius: 8px; overflow: hidden; background: var(--brand); color: #fff; }
+.skills-create button { height: 32px; border: 0; border-radius: 0; background: transparent; color: inherit; font: 600 13px/20px Inter, sans-serif; }
+.skills-create-main { display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; }
+.skills-create-main svg { flex: none; }
+.skills-create-more { width: 30px; padding: 0; border-left: 1px solid rgba(255,255,255,.28) !important; display: grid; place-items: center; }
+.skills-create button:hover { background: rgba(0,0,0,.08); }
+.skills-table-wrap { overflow-x: auto; }
+.skills-table { min-width: 720px; table-layout: fixed; }
+.skills-table th, .skills-table td { height: 52px; padding: 12px; border-bottom: 1px solid var(--line); color: var(--fg-strong); vertical-align: middle; }
+.skills-table th { height: 40px; background: var(--surface); font-size: 12px; font-weight: 500; }
+.skills-table th:nth-child(1) { width: 38%; }
+.skills-table th:nth-child(2) { width: 30%; }
+.skills-table th:nth-child(3) { width: 22%; }
+.skills-table th:nth-child(4) { width: 55px; }
+.skills-table .skill-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.skills-table .skill-menu-cell { text-align: center; padding-left: 4px; padding-right: 4px; }
+.skills-empty { padding: 18px 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.skill-create-note { min-height: 18px; color: var(--muted); }
+.skill-editor { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 0; min-width: 0; }
+.skill-editor-main { padding: 28px 32px 32px; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.skill-editor-side { border-left: 1px solid var(--line2); padding: 20px 18px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.skill-field { display: flex; flex-direction: column; gap: 4px; }
+.skill-field label, .skill-side-title { font-size: 13px; line-height: 20px; font-weight: 600; color: var(--fg); }
+.skill-field .field-help, .skill-side-help { font-size: 12px; line-height: 18px; color: var(--muted2); }
+.skill-field input, .skill-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: 13px/20px Inter, sans-serif; color: var(--fg-strong); background: var(--surface); }
+.skill-field input { height: 36px; }
+.skill-field textarea { min-height: 310px; resize: vertical; }
+.skill-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 11px 18px; border-bottom: 1px solid var(--line); }
+.skill-editor-title { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; color: var(--fg); }
+.skill-editor-actions { display: flex; align-items: center; gap: 8px; }
+.skill-editor-actions .icon-btn { color: var(--muted); }
+.skill-test { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px; background: var(--chip-bg); color: var(--fg); font: 600 13px/20px Inter, sans-serif; }
+.skill-test svg { flex: none; }
+.skill-editor-card { padding: 0; overflow: hidden; gap: 0; }
+.skill-section { border-top: 1px solid var(--line2); padding-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+.skill-section:first-child { border-top: 0; padding-top: 0; }
+.skill-section h4 { margin: 0; font-size: 13px; line-height: 20px; color: var(--fg); }
+.skill-action-chips, .skill-knowledge-list { display: flex; gap: 6px; flex-wrap: wrap; }
+.skill-knowledge-list { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
+.skill-knowledge { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line2); border-radius: 8px; color: var(--fg); }
+.skill-knowledge span { flex: 1; font-size: 13px; }
+.skill-add { align-self: flex-start; height: 28px; padding: 4px 10px; border-radius: 8px; background: var(--chip-bg); color: var(--fg); font: 500 13px/16px Inter, sans-serif; }
+.skill-safety-row { display: flex; align-items: flex-start; gap: 12px; }
+.skill-safety-copy { flex: 1; min-width: 0; }
+.skill-safety-copy strong { display: block; font-size: 13px; line-height: 20px; color: var(--fg); }
+.skill-safety-copy span { display: block; font-size: 12px; line-height: 18px; color: var(--muted2); }
+.skill-toggle { width: 40px; height: 20px; border: 0; border-radius: 10px; padding: 0; background: var(--line); position: relative; flex: none; }
+.skill-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.skill-toggle[aria-pressed="true"] { background: #36b37e; }
+.skill-toggle[aria-pressed="true"]::after { left: 22px; }
+.skill-footer { display: flex; justify-content: center; gap: 12px; padding: 16px 32px; border-top: 1px solid var(--line2); }
+.skill-editor-note { min-height: 18px; color: var(--muted); }
+@media (max-width: 800px) { .skill-editor { grid-template-columns: 1fr; } .skill-editor-side { border-left: 0; border-top: 1px solid var(--line2); } .skill-editor-main { padding: 20px; } }
 @media (max-width: 640px) { .detail-layout { grid-template-columns: 1fr; } }
+/* ---- Store actions (Figma 33930:24185) ---- */
+.actions-page { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.actions-header h2 { margin:0 0 4px; font-size:20px; line-height:28px; color:var(--fg); }
+.actions-header p { margin:0; color:var(--muted); font-size:13px; line-height:20px; max-width:780px; }
+.actions-alert { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid #f2caca; border-radius:10px; background:#fff6f6; color:var(--fg); }
+.actions-alert-copy { flex:1; min-width:0; }
+.actions-alert-copy strong { display:block; font-size:13px; line-height:20px; }
+.actions-alert-copy span { display:block; margin-top:2px; color:var(--muted); font-size:12px; line-height:18px; }
+.actions-alert-actions { display:flex; gap:8px; flex:none; }
+.action-stat-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; }
+.action-stat { padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.action-stat strong { display:block; font-size:20px; line-height:24px; color:var(--fg); }
+.action-stat span { display:block; margin-top:3px; font-size:12px; color:var(--muted); }
+.action-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.action-toolbar .search-field { margin-left:auto; width:220px; }
+.action-filters { display:flex; gap:6px; flex-wrap:wrap; }
+.filter-chip { height:30px; padding:0 11px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--muted); font:500 12px/18px Inter,sans-serif; cursor:pointer; }
+.filter-chip.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+.action-group { overflow:hidden; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.action-group h3 { margin:0; padding:14px 16px 10px; font-size:14px; color:var(--fg); }
+.action-table { min-width:760px; }
+.action-table-head,.action-row { display:grid; grid-template-columns:minmax(220px,1fr) 80px 190px 120px 66px; align-items:center; column-gap:12px; padding:0 16px; }
+.action-table-head { min-height:34px; border-bottom:1px solid var(--line); color:var(--muted); font-size:11px; }
+.action-row { min-height:58px; border-bottom:1px solid var(--line2); font-size:12px; color:var(--fg); }
+.action-row:last-child { border-bottom:0; }
+.action-row.failing { background:#fff8f8; }
+.action-name { font-weight:600; }
+.action-endpoint { display:block; margin-top:2px; color:var(--muted2); font:11px/16px ui-monospace,SFMono-Regular,Menlo,monospace; }
+.action-cell-muted { color:var(--muted); }
+.action-toggle { justify-self:end; width:38px; height:20px; border:0; border-radius:10px; padding:0; background:var(--line); position:relative; cursor:pointer; }
+.action-toggle::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+.action-toggle[aria-pressed="true"] { background:#36b37e; }
+.action-toggle[aria-pressed="true"]::after { left:20px; }
+.action-help { color:var(--brand); background:transparent; border:0; font:600 12px/18px Inter,sans-serif; cursor:pointer; }
+@media (max-width:800px) { .action-stat-grid { grid-template-columns:repeat(2,1fr); } .action-toolbar .search-field { margin-left:0; width:100%; } }
 /* ---- Connection-type choice and Chattrn API wizard ---- */
 .conn-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .conn-choice-card { display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; }
@@ -473,12 +569,12 @@ details summary { margin-top: 4px; }
       <section id="detailView" hidden style="display:flex;flex-direction:column;gap:20px">
         <div class="detail-layout">
           <nav class="subnav" aria-label="Store sections">
-            <span class="subnav-item on" aria-current="page">Overview</span>
-            <span class="subnav-item">Skills</span>
-            <span class="subnav-item">Knowledge</span>
-            <span class="subnav-item">Actions</span>
-            <span class="subnav-item">Product</span>
-            <span class="subnav-item">Connection</span>
+            <button type="button" class="subnav-item on" aria-current="page" data-detail-section="overview">Overview</button>
+            <button type="button" class="subnav-item" data-detail-section="skills">Skills</button>
+            <button type="button" class="subnav-item" data-detail-section="knowledge">Knowledge</button>
+            <button type="button" class="subnav-item" data-detail-section="actions">Actions</button>
+            <button type="button" class="subnav-item" data-detail-section="product">Product</button>
+            <button type="button" class="subnav-item" data-detail-section="connection">Connection</button>
           </nav>
           <div class="detail-main" id="detailBody"></div>
         </div>
@@ -2320,6 +2416,30 @@ details summary { margin-top: 4px; }
 
   // ---- Store overview (opened from the list). Edit connection reopens the wizard with this store. ----
   var detailStore = null;
+  var detailSection = "overview";
+  var skillRows = [
+    { name: "Order status & tracking", actions: ["Add order note", "Cancel order"], active: true },
+    { name: "Order cancellations", actions: ["Create discount code", "Edit shipping address"], active: false },
+    { name: "Promo code & free shipping", actions: ["Fetch order comment timeline"], active: false },
+    { name: "Shipping address update", actions: ["Cancel order"], active: false }
+  ];
+  var actionFilter = "All";
+  var actionRows = [
+    { group:"Shopping", name:"Search products", endpoint:"GET /products/search", risk:"Low", usedBy:"Product availability", status:"Enabled", on:true },
+    { group:"Shopping", name:"Product details", endpoint:"GET /products/{id}", risk:"Low", usedBy:"Product availability", status:"Enabled", on:true },
+    { group:"Shopping", name:"Check stock", endpoint:"GET /products?ids=", risk:"Low", usedBy:"Product availability", status:"Enabled", on:true },
+    { group:"Shopping", name:"Recommend products", endpoint:"GET /products/recommendations", risk:"Low", usedBy:"—", status:"Off", on:false },
+    { group:"Shopping", name:"Resolve delivery area", endpoint:"GET /locations/resolve", risk:"Low", usedBy:"Delivery area & fees", status:"Enabled", on:true },
+    { group:"Shopping", name:"Cart (add, update, remove)", endpoint:"POST /cart/quote", risk:"Low", usedBy:"—", status:"Needs setup", on:false, setup:true },
+    { group:"Shopping", name:"Apply coupon", endpoint:"POST /cart/quote", risk:"Low", usedBy:"—", status:"Needs setup", on:false, setup:true },
+    { group:"Shopping", name:"Checkout", endpoint:"POST /orders", risk:"Medium", usedBy:"—", status:"Needs setup", on:false, setup:true },
+    { group:"Orders", name:"Verify phone (OTP)", endpoint:"Chattrn SMS", risk:"Low", usedBy:"Order status & tracking", status:"Enabled", on:true },
+    { group:"Orders", name:"Find orders", endpoint:"GET /orders?phone=", risk:"Medium", usedBy:"Order status & tracking", status:"Enabled", on:true },
+    { group:"Orders", name:"Order details", endpoint:"GET /orders/{number}", risk:"Medium", usedBy:"Order status & tracking", status:"Failing", on:true, failing:true },
+    { group:"Orders", name:"Cancel order", endpoint:"POST /orders/{number}/cancel", risk:"High", usedBy:"—", status:"Not supported", on:false, unsupported:true },
+    { group:"Orders", name:"Update address", endpoint:"PATCH /orders/{number}", risk:"High", usedBy:"—", status:"Not supported", on:false, unsupported:true },
+    { group:"Custom", name:"Check warranty (IMEI)", endpoint:"GET /warranty?imei=", risk:"Low", usedBy:"Warranty check", status:"Enabled", on:true, custom:true }
+  ];
   function hostOf(u) { return String(u || "").replace(/^https?:\/\//, "").replace(/\/$/, ""); }
   function kv(label, valueHtml) {
     return '<div class="kv"><span class="kv-l">' + esc(label) + '</span><span class="kv-v">' + valueHtml + '</span></div>';
@@ -2328,6 +2448,7 @@ details summary { margin-top: 4px; }
     hideAllViews();
     $("detailView").hidden = false;
     closeStoreMenu();
+    setDetailSection("overview", false);
     $("detailBody").innerHTML = '<p class="hint">Loading…</p>';
     loadDetail(id);
   }
@@ -2345,6 +2466,8 @@ details summary { margin-top: 4px; }
   function renderDetail(s) {
     detailStore = s;
     setCrumbStore(s.name);
+    if (detailSection === "skills") { renderSkills(); return; }
+    if (detailSection === "actions") { renderActions(); return; }
     if (s.connection_type === "chattrn_api") { renderChattrnDetail(s); return; }
     if (s.connection_type === "laravel_package") { renderLaravelDetail(s); return; }
     var site = /^https?:\/\//.test(s.website_url || "")
@@ -2384,6 +2507,188 @@ details summary { margin-top: 4px; }
         kv("Import issue", s.catalog_sync?.error || "None reported") +
       '</div>';
   }
+
+  function setDetailSection(section, render) {
+    detailSection = section || "overview";
+    document.querySelectorAll("[data-detail-section]").forEach(function (item) {
+      var active = item.getAttribute("data-detail-section") === detailSection;
+      item.classList.toggle("on", active);
+      if (active) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
+    if (render !== false && detailStore) {
+      if (detailSection === "skills") renderSkills();
+      else if (detailSection === "actions") renderActions();
+      else if (detailSection === "overview" || detailSection === "connection") renderDetail(detailStore);
+      else renderUnavailableDetail(detailSection);
+    }
+  }
+
+  function renderUnavailableDetail(section) {
+    var label = section.charAt(0).toUpperCase() + section.slice(1);
+    $("detailBody").innerHTML = '<div class="card"><h3 class="card-title">' + esc(label) + '</h3><p class="hint">This store section will be added after Skills.</p></div>';
+  }
+
+  function actionBadge(status) {
+    var cls = status === "Enabled" ? "b-pass" : status === "Failing" ? "b-fail" : status === "Needs setup" ? "b-warn" : "b-skip";
+    return '<span class="badge ' + cls + '">' + esc(status) + '</span>';
+  }
+  function renderActions() {
+    if (!detailStore) return;
+    setCrumbStore(detailStore.name || "Store");
+    var failing = actionRows.filter(function (r) { return r.status === "Failing"; }).length;
+    var enabled = actionRows.filter(function (r) { return r.status === "Enabled"; }).length;
+    var off = actionRows.filter(function (r) { return r.status === "Off"; }).length;
+    var setup = actionRows.filter(function (r) { return r.status === "Needs setup"; }).length;
+    var unsupported = actionRows.filter(function (r) { return r.status === "Not supported"; }).length;
+    $("detailBody").innerHTML =
+      '<section class="actions-page" aria-labelledby="actionsHeading">' +
+        '<div class="actions-header"><h2 id="actionsHeading">Actions</h2><p>What the AI Agent and your team can do in your store. Standard actions come from your API test. Add custom actions for anything else your API can do.</p></div>' +
+        '<div class="actions-alert" role="status"><div class="actions-alert-copy"><strong id="actionAlertTitle">Order details is failing</strong><span id="actionAlertText">Your store returned an error for the last 5 requests (500 Server error). The AI is handing these chats to your team instead. Check the checks again every 2 minutes and turn it back on when it works.</span></div><div class="actions-alert-actions"><button type="button" class="btn-grey" id="actionViewErrors">View errors</button><button type="button" class="btn-red" id="actionTestNow">Test now</button></div></div>' +
+        '<div class="action-stat-grid"><div class="action-stat"><strong>' + enabled + '</strong><span>Enabled</span></div><div class="action-stat"><strong>' + failing + '</strong><span>Failing</span></div><div class="action-stat"><strong>' + off + '</strong><span>Off</span></div><div class="action-stat"><strong>' + setup + '</strong><span>Needs setup</span></div><div class="action-stat"><strong>' + unsupported + '</strong><span>Not supported</span></div></div>' +
+        '<div class="action-toolbar"><button type="button" class="primary" id="createCustomAction">＋ Create custom action</button><label class="search-field"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input type="search" id="actionSearch" placeholder="Search actions" autocomplete="off" aria-label="Search actions"></label></div>' +
+        '<div class="action-filters">' + ["All","Enabled","Failing","Custom","Needs setup","Not supported"].map(function (f) { return '<button type="button" class="filter-chip ' + (actionFilter === f ? 'on' : '') + '" data-action-filter="' + esc(f) + '">' + esc(f) + '</button>'; }).join("") + '</div>' +
+        '<div id="actionsList"></div><p class="skill-create-note" id="actionNote" role="status"></p>' +
+      '</section>';
+    renderActionRows("");
+  }
+  function renderActionRows(query) {
+    var target = $("actionsList"); if (!target) return;
+    var q = String(query || "").trim().toLowerCase();
+    var rows = actionRows.filter(function (r) {
+      var matches = !q || [r.name,r.endpoint,r.usedBy].join(" ").toLowerCase().indexOf(q) !== -1;
+      var filter = actionFilter === "All" || (actionFilter === "Custom" && r.custom) || (actionFilter === r.status);
+      return matches && filter;
+    });
+    var groups = []; rows.forEach(function (r) { if (groups.indexOf(r.group) === -1) groups.push(r.group); });
+    target.innerHTML = groups.map(function (group) {
+      return '<section class="action-group"><h3>' + esc(group) + '</h3><div class="action-table"><div class="action-table-head"><span>Action</span><span>Risk</span><span>Used by Skills</span><span>Status</span><span>On</span></div>' + rows.filter(function (r) { return r.group === group; }).map(function (r) {
+        var risk = r.risk === "High" ? "b-fail" : r.risk === "Medium" ? "b-warn" : "b-skip";
+        var control = r.setup ? '<button type="button" class="action-help" data-action-help="' + esc(r.name) + '">How to add</button>' : r.unsupported ? '<button type="button" class="action-help" data-action-help="' + esc(r.name) + '">Why?</button>' : '<button type="button" class="action-toggle" aria-label="Toggle ' + esc(r.name) + '" aria-pressed="' + (r.on ? 'true' : 'false') + '" data-action-toggle="' + esc(r.name) + '"></button>';
+        return '<div class="action-row ' + (r.failing ? 'failing' : '') + '"><div><span class="action-name">' + esc(r.name) + '</span><span class="action-endpoint">' + esc(r.endpoint) + '</span></div><span class="badge ' + risk + '">' + esc(r.risk) + '</span><span class="action-cell-muted">' + esc(r.usedBy) + '</span><span>' + actionBadge(r.status) + '</span><span>' + control + '</span></div>';
+      }).join("") + '</div></section>';
+    }).join("") || '<div class="card"><p class="hint">No actions match your search.</p></div>';
+  }
+
+  function renderSkills() {
+    if (!detailStore) return;
+    setCrumbStore(detailStore.name || "Store");
+    $("detailBody").innerHTML =
+      '<section class="skills-page" aria-labelledby="skillsHeading">' +
+        '<div><p class="skills-intro" id="skillsHeading">Train and manage knowledge from websites, links, and documents to help AI agents deliver accurate and context-aware responses.</p>' +
+        '<a class="skills-learn" href="#" id="skillsLearn"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 3.5h4A1.5 1.5 0 0 1 8 5v7.5A1.5 1.5 0 0 0 6.5 11h-4zM13.5 3.5h-4A1.5 1.5 0 0 0 8 5v7.5A1.5 1.5 0 0 1 9.5 11h4z"/></svg>Learn how to add Knowledge base</a></div>' +
+        '<div class="skills-tools">' +
+          '<span class="skills-create"><button type="button" class="skills-create-main" id="createSkill"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>Create Skill</button><button type="button" class="skills-create-more" id="createSkillMore" aria-label="More ways to create a skill" aria-expanded="false">⌄</button></span>' +
+          '<label class="search-field"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input type="search" id="skillSearch" placeholder="Search" autocomplete="off" aria-label="Search skills"></label>' +
+        '</div>' +
+        '<p class="skill-create-note" id="skillCreateNote" role="status"></p>' +
+        '<div class="skills-table-wrap"><table class="skills-table"><thead><tr><th>Skill</th><th>Linked Action</th><th>Status</th><th><span aria-label="Actions"></span></th></tr></thead><tbody id="skillRows"></tbody></table></div>' +
+      '</section>';
+    renderSkillRows("");
+  }
+
+  function renderCreateSkill() {
+    if (!detailStore) return;
+    setCrumbStore((detailStore.name || "Store") + " › Skills › Create Skill");
+    $("detailBody").innerHTML =
+      '<div class="card skill-editor-card" aria-labelledby="createSkillHeading">' +
+        '<div class="skill-editor-header"><div class="skill-editor-title"><span id="createSkillHeading">' + esc(detailStore.name || "Store") + '</span><span class="sep">›</span><span>Skills</span><span class="sep">›</span><span>Create Skill</span><span class="badge b-skip">Draft</span></div>' +
+        '<div class="skill-editor-actions"><button type="button" class="icon-btn" id="deleteSkillDraft" aria-label="Delete skill"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button><button type="button" class="skill-test" id="testSkill"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 5l11 7-11 7z"/></svg>Test Skill</button><button type="button" class="skill-toggle" aria-label="Enable skill" aria-pressed="false" id="skillEnabled"></button></div></div>' +
+        '<div class="skill-editor">' +
+          '<main class="skill-editor-main">' +
+            '<div class="skill-field"><label for="skillName">Name</label><input id="skillName" value="Order status &amp; tracking" autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillTrigger">When should the AI use this Skill?</label><input id="skillTrigger" value="The customer asks where their order is, when it will arrive, or for a tracking link." autocomplete="off"></div>' +
+            '<div class="skill-field"><label for="skillInstructions">Instructions <span class="field-help">(primary prompt)</span></label><textarea id="skillInstructions">1. Verify the customer\n\nIf the customer isn’t verified, THEN use action: Verify phone (OTP).\n\n2. Find the order\n\nIf the customer doesn’t mention an order number, THEN use their most recent order.\n\nUse action: Find orders then use action: Order details. If nothing is found, ask for the order number once, then hand off.\n\n3. Answer\n\n• IF Order: status = shipped, THEN share Shipment: courier and Shipment: tracking_url.\n• IF Order: status = processing AND Order: created_at is more than 3 days ago, THEN apologise and hand off to a human.\n• Always show the order card. Never guess a delivery date the store didn’t give.</textarea></div>' +
+            '<div class="skill-section"><div><h4>Uses actions</h4><p class="skill-side-help">Filled in from your instructions. Edit the instructions to change it.</p></div><div class="skill-action-chips" id="skillActionChips"><span class="badge b-skip">Verify phone</span><span class="badge b-skip">Find orders</span><span class="badge b-skip">Order details</span></div></div>' +
+          '</main>' +
+          '<aside class="skill-editor-side">' +
+            '<div class="skill-section"><div><h4>Details</h4></div><div class="kv"><span class="kv-l">Status</span><span class="kv-v"><span class="badge b-skip">Draft</span></span></div><div class="kv"><span class="kv-l">Store</span><span class="kv-v">' + esc(detailStore.name || "—") + '</span></div><div class="kv"><span class="kv-l">Used by</span><span class="kv-v">Not added to an agent</span></div></div>' +
+            '<div class="skill-section"><div><h4>Knowledge</h4><p class="skill-side-help">The AI uses these to fill gaps the instructions don’t cover.</p></div><div class="skill-knowledge-list"><label class="skill-knowledge"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/></svg><span>Shipping policy</span><button type="button" class="skill-toggle" aria-label="Use Shipping policy" aria-pressed="true"></button></label><label class="skill-knowledge"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/></svg><span>Delivery areas and times</span><button type="button" class="skill-toggle" aria-label="Use Delivery areas and times" aria-pressed="true"></button></label></div><button type="button" class="skill-add" id="addKnowledge">⊕ &nbsp;Add knowledge</button></div>' +
+            '<div class="skill-section"><h4>Safety</h4><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Require a verified customer</strong><span>Always on when a Skill reads orders.</span></div><button type="button" class="skill-toggle" aria-label="Require a verified customer" aria-pressed="false"></button></div><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Confirm before changing anything</strong><span>The customer says yes before an action that changes an order.</span></div><button type="button" class="skill-toggle" aria-label="Confirm before changing anything" aria-pressed="true"></button></div><div class="skill-safety-row"><div class="skill-safety-copy"><strong>Hand off if an action fails</strong><span>Passes the chat to your team with a summary.</span></div><button type="button" class="skill-toggle" aria-label="Hand off if an action fails" aria-pressed="true"></button></div></div>' +
+          '</aside>' +
+        '</div>' +
+        '<div class="skill-footer"><button type="button" class="plain" id="cancelSkill">Cancel</button><button type="button" class="primary" id="saveSkill">Save</button></div>' +
+        '<p class="skill-editor-note" id="skillEditorNote" role="status" style="padding:0 32px 12px"></p>' +
+      '</div>';
+  }
+
+  function renderSkillRows(query) {
+    var target = $("skillRows");
+    if (!target) return;
+    var q = String(query || "").trim().toLowerCase();
+    var rows = skillRows.filter(function (skill) {
+      return !q || skill.name.toLowerCase().indexOf(q) !== -1 || skill.actions.some(function (action) { return action.toLowerCase().indexOf(q) !== -1; });
+    });
+    if (!rows.length) {
+      target.innerHTML = '<tr><td colspan="4" class="skills-empty">No skills match your search.</td></tr>';
+      return;
+    }
+    target.innerHTML = rows.map(function (skill) {
+      return '<tr><td>' + esc(skill.name) + '</td><td><div class="skill-actions">' + skill.actions.map(function (action) { return '<span class="badge b-skip">' + esc(action) + '</span>'; }).join("") + '</div></td>' +
+        '<td><span class="badge ' + (skill.draft ? 'b-info' : skill.active ? 'b-pass' : 'b-skip') + '">' + (skill.draft ? 'Draft' : skill.active ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td class="skill-menu-cell"><button type="button" class="icon-btn" aria-label="Actions for ' + esc(skill.name) + '" data-skill-menu="' + esc(skill.name) + '">' + DOTS + '</button></td></tr>';
+    }).join("");
+  }
+
+  $("detailView").addEventListener("click", function (event) {
+    var nav = event.target.closest ? event.target.closest("[data-detail-section]") : null;
+    if (nav) { setDetailSection(nav.getAttribute("data-detail-section")); return; }
+    var filter = event.target.closest ? event.target.closest("[data-action-filter]") : null;
+    if (filter) { actionFilter = filter.getAttribute("data-action-filter"); renderActions(); return; }
+    var actionToggle = event.target.closest ? event.target.closest("[data-action-toggle]") : null;
+    if (actionToggle) {
+      var action = actionRows.find(function (r) { return r.name === actionToggle.getAttribute("data-action-toggle"); });
+      if (action && !action.failing) { action.on = !action.on; action.status = action.on ? "Enabled" : "Off"; renderActions(); }
+      else if (action) { $("actionNote").textContent = "Order details is temporarily disabled while its endpoint is failing."; }
+      return;
+    }
+    var actionHelp = event.target.closest ? event.target.closest("[data-action-help]") : null;
+    if (actionHelp) { $("actionNote").textContent = actionHelp.getAttribute("data-action-help") + " setup guidance will be available when action configuration is connected."; return; }
+    if (event.target.closest && event.target.closest("#createCustomAction")) { $("actionNote").textContent = "Custom action creation will be added next."; return; }
+    if (event.target.closest && event.target.closest("#actionViewErrors")) { $("actionNote").textContent = "Showing the latest 5 failed requests for Order details will be available in the error viewer."; return; }
+    if (event.target.closest && event.target.closest("#actionTestNow")) { $("actionAlertText").textContent = "Testing Order details now…"; setTimeout(function () { if ($("actionAlertText")) $("actionAlertText").textContent = "Your store returned an error for the last 5 requests (500 Server error). The AI is handing these chats to your team instead."; }, 650); return; }
+    if (event.target.closest && event.target.closest("#skillsLearn")) {
+      event.preventDefault();
+      $("skillCreateNote").textContent = "Knowledge-base guidance will be connected in the next implementation phase.";
+      return;
+    }
+    if (event.target.closest && event.target.closest("#createSkill")) {
+      renderCreateSkill();
+      return;
+    }
+    if (event.target.closest && event.target.closest("#createSkillMore")) {
+      var more = $("createSkillMore");
+      if (more) more.setAttribute("aria-expanded", more.getAttribute("aria-expanded") === "true" ? "false" : "true");
+      $("skillCreateNote").textContent = "Choose Create Skill to open the editor.";
+      return;
+    }
+    if (event.target.closest && event.target.closest("#cancelSkill, #deleteSkillDraft")) {
+      setDetailSection("skills");
+      return;
+    }
+    if (event.target.closest && event.target.closest("#saveSkill")) {
+      var name = $("skillName").value.trim();
+      var trigger = $("skillTrigger").value.trim();
+      var instructions = $("skillInstructions").value.trim();
+      var note = $("skillEditorNote");
+      if (!name || !trigger || !instructions) { if (note) note.textContent = "Name, trigger, and instructions are required."; return; }
+      skillRows = skillRows.filter(function (row) { return row.name !== name; });
+      skillRows.unshift({ name: name, actions: ["Verify phone", "Find orders", "Order details"], active: $("skillEnabled").getAttribute("aria-pressed") === "true", draft: true, trigger: trigger, instructions: instructions });
+      setDetailSection("skills");
+      $("skillCreateNote").textContent = name + " saved as a draft.";
+      return;
+    }
+    var toggle = event.target.closest ? event.target.closest(".skill-toggle") : null;
+    if (toggle) { toggle.setAttribute("aria-pressed", toggle.getAttribute("aria-pressed") === "true" ? "false" : "true"); return; }
+    if (event.target.closest && event.target.closest("#testSkill")) { $("skillEditorNote").textContent = "Skill test will run after actions and agent connections are available."; return; }
+    if (event.target.closest && event.target.closest("#addKnowledge")) { $("skillEditorNote").textContent = "Knowledge selection will be connected to your store knowledge base next."; return; }
+    var menu = event.target.closest ? event.target.closest("[data-skill-menu]") : null;
+    if (menu) $("skillCreateNote").textContent = menu.getAttribute("data-skill-menu") + " actions will be available when skill management is connected.";
+  });
+  $("detailView").addEventListener("input", function (event) {
+    if (event.target.id === "skillSearch") renderSkillRows(event.target.value);
+    if (event.target.id === "actionSearch") renderActionRows(event.target.value);
+  });
 
   // Connection (Chattrn API) tab (devspec.txt screens list, "11d. Custom website: Connection (Chattrn API)").
   function renderChattrnDetail(s) {
