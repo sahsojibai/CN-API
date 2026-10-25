@@ -27,7 +27,7 @@
 <script>
 const $=id=>document.getElementById(id);let stores=[],store=null,session=null,products=[];
 const log=(...x)=>{$('log').textContent=(x.map(v=>typeof v==='string'?v:JSON.stringify(v,null,2)).join(' ')+'\n'+$('log').textContent).slice(0,12000)};
-async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});let j={};try{j=await r.json()}catch{};log((opt.method||'GET')+' '+path+' → '+r.status,j);if(!r.ok)throw new Error(j.error?.message||j.message||'Request failed');return j}
+async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json','X-Chattrn-Request':'dashboard',...(opt.headers||{})},...opt});let j={};try{j=await r.json()}catch{};log((opt.method||'GET')+' '+path+' → '+r.status,j);if(!r.ok)throw new Error(j.error?.message||j.message||'Request failed');return j}
 function say(text,who='bot'){const d=document.createElement('div');d.className='bubble '+who;d.textContent=text;$('chat').append(d);$('chat').scrollTop=$('chat').scrollHeight}
 function setStatus(t){$('status').textContent=t}
 function chosenVariant(p){return p.variants?.[0]||{id:p.id,price:p.price,stock:p.stock,title:'Default'}}
