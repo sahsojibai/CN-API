@@ -101,9 +101,13 @@ async function executeAction(ctx, store, action, values, { confirm = false, idem
   const request = prepareRequest(action, values);
   if (request.missing.length) return { status: 422, code: "missing_action_inputs", message: `Missing required inputs: ${request.missing.join(", ")}.`, missing: request.missing };
   const response = nativeStore(store)
-    ? await CL.call(ctx, store, { path: request.path, method: action.method, body: request.body })
+    ? await CL.call(ctx, store, { path: request.path, method: action.method, body: request.body, timeoutMs: action.method === "GET" ? 30000 : 15000 })
     : await SC.call(ctx, store, { path: request.path, method: action.method, body: request.body });
-  const result = { status: response.http >= 200 && response.http < 300 ? 200 : 502, ok: response.http >= 200 && response.http < 300, http: response.http, action: action.name, response: response.json || response.text || null };
+  const ok = response.http >= 200 && response.http < 300;
+  const message = ok ? undefined : response.http == null
+    ? (response.error === "timeout" ? "The connected API did not respond within 30 seconds." : `The connected API could not be reached (${response.error || "network error"}).`)
+    : `The connected API returned HTTP ${response.http}.`;
+  const result = { status: ok ? 200 : 502, ok, http: response.http, action: action.name, message, upstream_error: response.error || null, response: response.json || response.text || null };
   if (key) store.runtime_idempotency = { ...(store.runtime_idempotency || {}), [key]: result };
   return result;
 }
