@@ -352,8 +352,8 @@ details summary { margin-top: 4px; }
 .action-detail-item { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
 .action-detail-item strong { display:block; color:var(--muted); font-size:12px; margin-bottom:4px; }
 .skill-instructions-wrap { position:relative; }
-.skill-instructions-editor { min-height:310px; border:1.5px solid var(--brand); border-radius:10px; padding:14px 12px; font:13px/22px Inter,sans-serif; color:var(--fg-strong); white-space:pre-wrap; outline:0; }
-.skill-inline-token { display:inline-flex; align-items:center; gap:4px; margin:0 2px; padding:1px 7px; border-radius:6px; background:#f1f4f5; color:#2b3546; font:500 12px/20px Inter,sans-serif; vertical-align:baseline; white-space:nowrap; }
+.skill-instructions-editor { height:360px; min-height:360px; max-height:360px; overflow-y:auto; box-sizing:border-box; border:1.5px solid var(--brand); border-radius:10px; padding:14px 12px; font:13px/22px Inter,sans-serif; color:var(--fg-strong); white-space:pre-wrap; outline:0; }
+.skill-inline-token { display:inline-flex; align-items:center; justify-content:center; gap:4px; margin:0 2px; padding:1px 7px; border-radius:6px; background:#f1f4f5; color:#2b3546; font:500 12px/20px Inter,sans-serif; vertical-align:middle; white-space:nowrap !important; min-width:max-content; }
 .skill-inline-token.action::before { content:"⚡"; color:var(--brand); }
 .skill-inline-token.field::before { content:"{}"; color:var(--brand); font-size:11px; }
 .skill-instructions-editor:empty::before { content:attr(data-placeholder); color:var(--muted2); }
@@ -2706,6 +2706,10 @@ details summary { margin-top: 4px; }
     var editor = $("skillInstructions"), selection = window.getSelection();
     if (editor && selection && selection.rangeCount && editor.contains(selection.getRangeAt(0).commonAncestorContainer)) skillCaretRange = selection.getRangeAt(0).cloneRange();
   }
+  // Keep the last editor selection alive while the user interacts with the
+  // insertion toolbar. Browsers move focus to the button on mousedown, which
+  // otherwise causes a later insertion to fall back to the start of the editor.
+  document.addEventListener("selectionchange", rememberSkillCaret);
   function skillInstructionText() {
     var el = $("skillInstructions");
     if (!el) return "";
@@ -2743,9 +2747,12 @@ details summary { margin-top: 4px; }
   }
   function insertSkillToken(token) {
     var editor = $("skillInstructions"); if (!editor) return;
-    editor.focus();
     var selection = window.getSelection(), range = skillCaretRange && editor.contains(skillCaretRange.commonAncestorContainer) ? skillCaretRange.cloneRange() : document.createRange();
     if (!skillCaretRange || !editor.contains(skillCaretRange.commonAncestorContainer)) { range.selectNodeContents(editor); range.collapse(false); }
+    editor.focus();
+    // Focus can reset the selection in some browsers; explicitly restore the
+    // saved range after focusing, then operate on the browser's live range.
+    selection.removeAllRanges(); selection.addRange(range); range = selection.getRangeAt(0);
     range.deleteContents();
     var isAction = token.indexOf("Use action: ") === 0, label = isAction ? token.slice(12) : token;
     var chip = document.createElement("span"); chip.className = "skill-inline-token " + (isAction ? "action" : "field"); chip.setAttribute("data-skill-token", token); chip.setAttribute("contenteditable", "false"); chip.textContent = label;
@@ -2778,6 +2785,15 @@ details summary { margin-top: 4px; }
     }).join("");
   }
 
+  $("detailView").addEventListener("mousedown", function (event) {
+    var toolbarButton = event.target.closest ? event.target.closest("#insertSkillAction, #insertSkillField") : null;
+    if (toolbarButton) {
+      rememberSkillCaret();
+      // Do not let the toolbar button steal the contenteditable selection
+      // before the click handler opens the picker.
+      event.preventDefault();
+    }
+  });
   $("detailView").addEventListener("click", async function (event) {
     var insertMenu = $("skillInsertMenu");
     if (insertMenu && !insertMenu.hidden && !event.target.closest("#skillInsertMenu, #insertSkillAction, #insertSkillField")) insertMenu.hidden = true;
