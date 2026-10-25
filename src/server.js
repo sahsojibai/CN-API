@@ -24,6 +24,7 @@ const LT = require("./laravel-token");
 const { configurationStamp, activationProblem } = require("./onboarding");
 const { assertBrandAvailable, brandDirectory, brandKey } = require("./brands");
 const { ensurePackageReady } = require("./package-ready");
+const AR = require("./action-runtime");
 
 // Serialize exchanges within this process; PostgreSQL revisions protect cross-process writes.
 const registrationLocks = new Map();
@@ -284,6 +285,71 @@ function createApp({ dataDir, publicDir, adminToken, secretKey, database }) {
       ? await CL.call(ctx, store, { path: requestPath, method: action.method, body: action.method === "GET" ? undefined : values })
       : await SC.call(ctx, store, { path: requestPath, method: action.method, body: action.method === "GET" ? undefined : values });
     return { status: 200, body: { ok: response.http >= 200 && response.http < 300, http: response.http, response: response.json || response.text || null } };
+  });
+
+  // Runtime primitives used by the widget and Inbox. The dashboard remains the
+  // only caller until a public widget session token is issued by the host app.
+  route("GET", "/api/stores/:id/runtime/actions", async ({ params }) => {
+    const store = await findStore(params.id);
+    return { body: { actions: AR.listStandardActions(store).concat((store.actions || []).filter((action) => action.active !== false).map((action) => ({ ...action, standard: false }))) } };
+  });
+  route("POST", "/api/stores/:id/runtime/sessions", async ({ params, body }) => {
+    const store = await findStore(params.id);
+    const session = AR.newSession(store, { customer_id: body.customer_id });
+    await db.put(store);
+    return { status: 201, body: { session } };
+  });
+  route("GET", "/api/stores/:id/runtime/sessions/:sessionId", async ({ params }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    return { body: { session } };
+  });
+  route("GET", "/api/stores/:id/runtime/sessions/:sessionId/cart", async ({ params }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    return { body: { cart: session.cart } };
+  });
+  route("POST", "/api/stores/:id/runtime/sessions/:sessionId/cart", async ({ params, body }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    const result = await AR.mutateCart(ctx, store, session, body.operation || "add", body, { confirm: body.confirm === true, idempotency_key: body.idempotency_key });
+    await db.put(store);
+    return { status: result.status || 200, body: result };
+  });
+  route("POST", "/api/stores/:id/runtime/sessions/:sessionId/checkout", async ({ params, body }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    const result = await AR.completeCart(ctx, store, session, { confirm: body.confirm === true, idempotency_key: body.idempotency_key });
+    await db.put(store);
+    return { status: result.status || 200, body: result };
+  });
+  route("POST", "/api/stores/:id/runtime/sessions/:sessionId/actions/:actionRef", async ({ params, body }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    const action = AR.resolveAction(store, params.actionRef);
+    if (!action) throw new HttpError(404, "runtime_action_not_found", "No enabled standard or custom action matches that name.");
+    const result = await AR.executeSessionAction(ctx, store, session, action, body.values || {}, { confirm: body.confirm === true, idempotency_key: body.idempotency_key });
+    if (body.cart) session.cart = { ...session.cart, ...body.cart };
+    await db.put(store);
+    return { status: result.status || 200, body: result };
+  });
+  route("POST", "/api/stores/:id/runtime/sessions/:sessionId/skills/:skillRef/run", async ({ params, body }) => {
+    const store = await findStore(params.id), session = AR.sessionFor(store, params.sessionId);
+    if (!session) throw new HttpError(404, "runtime_session_not_found", "This conversation session has expired or does not exist.");
+    const skill = (Array.isArray(store.skills) ? store.skills : []).find((item) => item.id === params.skillRef || item.name.toLowerCase() === String(params.skillRef).toLowerCase());
+    if (!skill) throw new HttpError(404, "runtime_skill_not_found", "No skill matches that name.");
+    if (skill.active !== true) throw new HttpError(409, "runtime_skill_disabled", "Enable the skill before running it.");
+    if (!Array.isArray(body.steps) || body.steps.length > 30) throw new HttpError(422, "runtime_steps_required", "Provide up to 30 ordered action steps.");
+    const results = [];
+    for (const step of body.steps) {
+      const action = AR.resolveAction(store, step && (step.action_id || step.action || step.name));
+      if (!action) { results.push({ status: 404, code: "runtime_action_not_found", message: "The requested action is unavailable." }); break; }
+      const result = await AR.executeSessionAction(ctx, store, session, action, step.values || {}, { confirm: step.confirm === true, idempotency_key: step.idempotency_key });
+      results.push(result);
+      if (result.status !== 200) break;
+    }
+    await db.put(store);
+    return { status: results.every((result) => result.status === 200) ? 200 : (results.find((result) => result.status !== 200)?.status || 502), body: { skill: { id: skill.id, name: skill.name }, results, session } };
   });
 
   // Replace key: the new key is tested first. If it fails, the old key keeps working.
