@@ -192,7 +192,7 @@ select { height: 36px; }
 .badge.b-pink { background: #e8dcf8; color: var(--brand); }
 details summary { margin-top: 4px; }
 
-/* ---- Laravel wizard: Connect / Map your tables / Verify (Figma layout) ---- */
+/* ---- Laravel wizard: Connect / Review / Test connection (Figma layout) ---- */
 .lock-note { display: flex; gap: 10px; align-items: flex-start; background: var(--field); border-radius: 8px; padding: 10px 12px; color: var(--muted); font-size: 12px; line-height: 18px; }
 .lock-note svg { flex: none; margin-top: 1px; }
 .lmcat { margin: 4px 0 0; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
@@ -648,11 +648,10 @@ details summary { margin-top: 4px; }
         <p class="page-sub">Connect a store that already speaks the Chattrn API: the same resources and fields as Shopify's Admin REST API, read with your access token.</p>
       </header>
 
-      <div class="stepper" aria-label="Setup steps">
+      <div class="stepper stepper-3" aria-label="Setup steps">
         <button type="button" class="cstep" data-cstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">Address and authentication</span></span></button>
         <button type="button" class="cstep" data-cstep="2"><span class="num">2</span><span><span class="t" style="display:block">Review</span><span class="s">Mappings and capabilities</span></span></button>
-        <button type="button" class="cstep" data-cstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Read-only checks</span></span></button>
-        <button type="button" class="cstep" data-cstep="4"><span class="num">4</span><span><span class="t" style="display:block">Activate</span><span class="s">Delivery and final review</span></span></button>
+        <button type="button" class="cstep" data-cstep="3"><span class="num">3</span><span><span class="t" style="display:block">Test connection</span><span class="s">Read-only connection checks</span></span></button>
       </div>
 
       <!-- STEP 1: Store and API -->
@@ -685,30 +684,11 @@ details summary { margin-top: 4px; }
         </div>
       </section>
 
-      <!-- STEP 2: Test connection -->
-      <section data-cpanel="2" hidden><div class="card"><h3>Review API capabilities</h3><p class="hint">Your API already uses the Chattrn schema. Review the advertised capabilities; verification checks which ones work. No field mapping is required.</p><div id="cReviewPanel"></div></div></section>
+      <!-- STEP 2: Review -->
+      <section data-cpanel="2" hidden><div class="card"><h3>Review API capabilities</h3><p class="hint">Your API already uses the Chattrn schema. Review the advertised capabilities before testing the connection. No field mapping is required.</p><div id="cReviewPanel"></div></div></section>
+      <!-- STEP 3: Test connection -->
       <section data-cpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
         <div id="cTestPanel" style="display:flex;flex-direction:column;gap:20px"></div>
-      </section>
-
-      <!-- STEP 3: Delivery setup -->
-      <section data-cpanel="4" hidden style="display:flex;flex-direction:column;gap:20px">
-        <div class="card" id="cDeliveryCard">
-          <div class="card-head">
-            <div><div class="sec-title">Delivery zones</div><p class="hint" style="margin-top:4px">Zones, areas and minimum orders come from your store and stay in sync. Edit them in your store, not here.</p></div>
-            <span class="badge b-skip">Read from GET /locations.json</span>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Zone</th><th>Areas</th><th>Minimum order</th></tr></thead>
-            <tbody id="cZoneRows"><tr><td colspan="3" class="hint">Loading zones…</td></tr></tbody>
-          </table></div>
-        </div>
-        <div class="card">
-          <div><div class="sec-title">When should the AI ask for the area?</div><p class="hint" style="margin-top:4px">Asked once per customer. It's saved on the conversation, so a human agent sees it too.</p></div>
-          <label class="opt"><input type="radio" name="cAsk" checked><span><span class="opt-title">When the customer first asks about a product <span class="badge b-pink">Recommended</span></span></span></label>
-          <label class="opt"><input type="radio" name="cAsk"><span><span class="opt-title">At the start of every new chat</span></span></label>
-          <label class="opt" style="border-top:1px solid var(--line2);padding-top:14px"><input type="checkbox" id="cRemember" checked><span class="opt-title">Remember the area for returning customers</span></label>
-        </div>
       </section>
 
       <div class="footer" style="border:0;padding:0;margin-top:0">
@@ -723,11 +703,10 @@ details summary { margin-top: 4px; }
         <p class="page-sub" id="lPageSub">One-time &mdash; exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes.</p>
       </header>
 
-      <div class="stepper" aria-label="Setup steps">
+      <div class="stepper stepper-3" aria-label="Setup steps">
         <button type="button" class="lstep" data-lstep="1"><span class="num">1</span><span><span class="t" style="display:block">Connect</span><span class="s">Address and authentication</span></span></button>
         <button type="button" class="lstep" data-lstep="2"><span class="num">2</span><span><span class="t" style="display:block">Review</span><span class="s">Mappings and capabilities</span></span></button>
-        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Verify</span><span class="s">Read-only checks</span></span></button>
-        <button type="button" class="lstep" data-lstep="4"><span class="num">4</span><span><span class="t" style="display:block">Activate</span><span class="s">Delivery and final review</span></span></button>
+        <button type="button" class="lstep" data-lstep="3"><span class="num">3</span><span><span class="t" style="display:block">Test connection</span><span class="s">Read-only connection checks</span></span></button>
       </div>
 
       <!-- STEP 1: Connect -->
@@ -802,12 +781,10 @@ details summary { margin-top: 4px; }
         <div id="lMapPanel"><p class="hint">Reading your app's tables&hellip;</p></div>
       </section>
 
-      <!-- STEP 3: Verify -->
+      <!-- STEP 3: Test connection -->
       <section data-lpanel="3" hidden style="display:flex;flex-direction:column;gap:20px">
-        <div id="lVerifyPanel"><p class="hint">Running the checks against your store&hellip;</p></div>
+        <div id="lVerifyPanel"><p class="hint">Run the connection test to check your store&hellip;</p></div>
       </section>
-
-      <section data-lpanel="4" hidden><div class="card"><h3>Delivery and activation</h3><p id="lActivationSummary" class="hint"></p><label class="opt"><input type="checkbox" id="lRemember" checked><span>Remember the customer's delivery area</span></label><p class="hint">Activation requires a successful verification of the current reviewed configuration. Unsupported write actions remain disabled.</p></div></section>
       <div class="footer" style="border:0;padding:0;margin-top:0">
         <button type="button" class="plain" id="lBack">Back</button>
         <button type="button" class="primary" id="lNext">Continue: map your tables</button>
@@ -840,14 +817,13 @@ details summary { margin-top: 4px; }
     <div id="wizardView" class="wizard-view" hidden>
       <header>
         <h1 class="page-title">Connect a custom website</h1>
-        <p class="page-sub">Connect your own ecommerce website through its API. Products, stock and orders then work in Skills, Actions, the AI Agent, the widget and the inbox, just like a Shopify store. Connection settings and diagnostic samples are saved. Verification does not change live orders.</p>
+        <p class="page-sub">Connect your own ecommerce website through its API. Products, stock and orders then work in Skills, Actions, the AI Agent, the widget and the inbox, just like a Shopify store. Connection settings and diagnostic samples are saved. Connection tests do not change live orders.</p>
       </header>
 
-      <div class="stepper" aria-label="Setup steps">
+      <div class="stepper stepper-3" aria-label="Setup steps">
         <button type="button" class="step" data-step="1" ><span class="num">1</span><span><span class="t" style="display:block">Your API</span><span class="s">Endpoints and sign-in</span></span></button>
         <button type="button" class="step" data-step="2" ><span class="num">2</span><span><span class="t" style="display:block">Map fields</span><span class="s">Suggested matches, you check</span></span></button>
         <button type="button" class="step" data-step="3" ><span class="num">3</span><span><span class="t" style="display:block">Test connection</span><span class="s">Data and speed</span></span></button>
-        <button type="button" class="step" data-step="4" ><span class="num">4</span><span><span class="t" style="display:block">Delivery setup</span><span class="s">Where you deliver</span></span></button>
       </div>
 
       <!-- STEP 1: Your API -->
@@ -956,8 +932,8 @@ details summary { margin-top: 4px; }
         </div>
       </section>
 
-      <!-- STEP 4: Delivery setup -->
-      <section data-panel="4" hidden style="display:flex;flex-direction:column;gap:20px">
+      <!-- Delivery settings are retained for existing mappings but are no longer a lifecycle step. -->
+      <section data-panel="4" hidden aria-hidden="true" style="display:none">
         <div class="card" id="deliveryCard">
           <div class="card-head">
             <div>
@@ -1280,7 +1256,7 @@ details summary { margin-top: 4px; }
       setProgress("Discovering product samples automatically. No customer location is required…");
       await prepareMappedConnection();
       var result = {status:"pass", records:state.products, listKey:"automatic samples", http:200,
-        message:state.products.length + " mapping samples discovered automatically. The full catalog covers all locations and imports in the background after activation."};
+        message:state.products.length + " mapping samples discovered automatically. The full catalog covers all locations and imports in the background after connection."};
       state.pageCount = 1;
       return result;
     } catch (error) { return {status:"fail", records:[], message:error.message}; }
@@ -2058,26 +2034,26 @@ details summary { margin-top: 4px; }
   }
   async function runMappedVerification() {
     state.progress.verified = false; $("next").disabled = true;
-    $("testPanel").innerHTML = '<p class="hint">Verifying the saved mapping through Chattrn…</p>';
+    $("testPanel").innerHTML = '<p class="hint">Testing the saved mapping through Chattrn…</p>';
     try {
       var res = await backend("POST", "/api/stores/" + await ensureBackendStore() + "/test-runs", {});
-      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
+      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Connection test failed.");
       state.progress.verified = res.body.can_continue === true;
-      $("finishNote").textContent = state.progress.verified ? "Verification passed. You can continue to activation." :
-        "Activation is blocked: " + (res.body.activation_blockers || []).map(function (b) { return b.label + ": " + b.message; }).join(" ");
-      $("testPanel").innerHTML = '<div class="card"><p class="hint">Verification uses automatic samples. Whole-store import includes every location and continues in the background.</p>' + res.body.checks.map(checkRowHtml).join("") +
+      $("finishNote").textContent = state.progress.verified ? "Connection test passed. You can connect." :
+        "Connection is blocked: " + (res.body.activation_blockers || []).map(function (b) { return b.label + ": " + b.message; }).join(" ");
+      $("testPanel").innerHTML = '<div class="card"><p class="hint">The connection test uses automatic samples. Whole-store import includes every location and continues in the background.</p>' + res.body.checks.map(checkRowHtml).join("") +
         (res.body.data_quality || []).map(checkRowHtml).join("") + '<p id="mappedCatalogProgress" class="hint"></p><button type="button" id="runAgain">Run verification again</button></div>';
       if (state.progress.verified) watchCatalog(state.storeId, "mappedCatalogProgress");
       ChattrnSetup.render(document.querySelectorAll(".step"), state.step, state.progress);
-    } catch(e) { $("testPanel").textContent = e.message; $("finishNote").textContent = "Activation is blocked: verification did not finish. " + e.message; }
+      } catch(e) { $("testPanel").textContent = e.message; $("finishNote").textContent = "Connection is blocked: the test did not finish. " + e.message; }
     finally { $("next").disabled = !state.progress.verified; }
   }
   // ---- Steps -------------------------------------------------------------
   var STEP_NEXT = ChattrnSetup.steps.map(function (s) { return s.next; });
-  var STEP_SUB = ["Endpoints and sign-in", "Suggested matches, you check", "Data and speed", "Where you deliver"];
+  var STEP_SUB = ["Endpoints and sign-in", "Suggested matches, you check", "Data and speed"];
   function showStep(n) {
     state.progress = state.progress || {};
-    state.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(state.progress)));
+    state.step = Math.max(1, Math.min(3, n, ChattrnSetup.unlocked(state.progress)));
 
     document.querySelectorAll("[data-panel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-panel")) !== state.step;
@@ -2090,7 +2066,6 @@ details summary { margin-top: 4px; }
       renderMap();
     }
     if (state.step === 3) runMappedVerification();
-    if (state.step === 4 && state.storeId) watchCatalog(state.storeId, "zoneStatus");
   }
 
   function setMode(m) {
@@ -2198,8 +2173,9 @@ details summary { margin-top: 4px; }
       } else if (state.step === 2) {
         await saveMappedReview(); state.progress.reviewed = true; showStep(3);
       } else if (state.step === 3) {
-        if (!state.progress.verified) throw new Error("Verification must pass before activation."); showStep(4);
-      } else await finishConnection();
+        if (!state.progress.verified) throw new Error("The test connection must pass before connecting.");
+        await finishConnection();
+      }
     } catch(e) { $("detailsErr").hidden = false; $("detailsErr").textContent = e.message; $("finishNote").textContent = e.message; }
     finally { button.disabled = state.step === 3 && !state.progress.verified; }
   });
@@ -3226,8 +3202,8 @@ details summary { margin-top: 4px; }
 
   // ---- Chattrn API wizard (native connector, slice 1B: Store and API -> Test connection -> Delivery setup) ----
   var cState = { step: 1, storeId: null };
-  var CSTEP_NEXT = STEP_NEXT;
-  var CSTEP_SUB = ["Base URL and access token", "Data and speed", "Where you deliver"];
+  var CSTEP_NEXT = ["Continue: review", "Continue: test connection", "Connect"];
+  var CSTEP_SUB = ["Base URL and access token", "Mappings and capabilities", "Read-only connection checks"];
 
   function resetChattrnStore() { cState.storeId = null; cState.progress = {}; }
 
@@ -3246,7 +3222,7 @@ details summary { margin-top: 4px; }
 
   function cShowStep(n) {
     cState.progress = cState.progress || {};
-    cState.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(cState.progress)));
+    cState.step = Math.max(1, Math.min(3, n, ChattrnSetup.unlocked(cState.progress)));
 
     document.querySelectorAll("[data-cpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-cpanel")) !== cState.step;
@@ -3256,7 +3232,6 @@ details summary { margin-top: 4px; }
     $("cNext").textContent = CSTEP_NEXT[cState.step - 1];
     if (cState.step === 2) renderNativeReview();
     if (cState.step === 3) runChattrnTest();
-    if (cState.step === 4) loadChattrnZones();
   }
   document.querySelectorAll(".cstep").forEach(function (b) {
     b.addEventListener("click", function () { if (Number(b.getAttribute("data-cstep")) <= cState.step) cShowStep(Number(b.getAttribute("data-cstep"))); });
@@ -3328,8 +3303,7 @@ details summary { margin-top: 4px; }
       finally { btn.disabled = cState.step === 3 && !cState.progress.verified; }
       return;
     }
-    if (cState.step === 3) { if (cState.progress.verified) cShowStep(4); return; }
-    await finishChattrnConnection();
+    if (cState.step === 3) { if (cState.progress.verified) await finishChattrnConnection(); return; }
   });
 
   ["cBase", "cToken", "cSiteUrl", "cBrand"].forEach(function (id) { $(id).addEventListener("change", resetChattrnStore); });
@@ -3347,7 +3321,7 @@ details summary { margin-top: 4px; }
     try {
       id = await ensureChattrnStore();
       var res = await backend("POST", "/api/stores/" + id + "/test-runs", {});
-      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Verification failed.");
+      if (res.http !== 200 || !res.body.checks) throw new Error(res.body.error?.message || "Connection test failed.");
       if (cState.step !== 3 || cState.storeId !== id) return;
       var run = res.body; cState.progress.verified = run.can_continue === true;
       ChattrnSetup.render(document.querySelectorAll(".cstep"), cState.step, cState.progress);
@@ -3359,12 +3333,12 @@ details summary { margin-top: 4px; }
       var pending = checks.filter(function (c) { return c.state === "capability_only"; }).length;
       var banner = '<div class="banner ' + (run.can_continue ? 'ok' : 'warn') + '">' +
         '<span class="ico ' + (run.can_continue ? 'ico-pass' : 'ico-warn') + ' big">' + (run.can_continue ? '&#10003;' : '!') + '</span>' +
-        '<div class="banner-body"><strong>' + (run.can_continue ? 'Connection verified' : 'Verification needs attention') + '</strong>' +
+        '<div class="banner-body"><strong>' + (run.can_continue ? 'Connection test passed' : 'Connection test needs attention') + '</strong>' +
         '<span class="hint" style="margin:0">Chattrn API schema and live store responses checked</span></div>' +
         '<span class="hint" style="margin:0">Checked just now</span>' +
         '<button type="button" class="primary" id="cRerun" style="background:#1c8274">Run test again</button></div>';
       var checksHtml = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test connection</div>' +
-        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (pending ? " · " + pending + " pending verification" : "") + '</p></div>' +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (pending ? " · " + pending + " pending test" : "") + '</p></div>' +
         '<div class="check-list">' + checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + '</div></div>';
       var dqHtml = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
         '<p class="hint" style="margin-top:4px">A connection can respond and still send data the AI can’t use well. These checks catch that before customers do.</p></div>' +
@@ -3409,11 +3383,11 @@ details summary { margin-top: 4px; }
       await saveDeliverySettings(id, {
         mode: $("cStoreType").value,
         ask_area_when: "when_needed",
-        remember_area: $("cRemember").checked,
+        remember_area: $("cRemember") ? $("cRemember").checked : true,
       });
       var activation = await backend("POST", "/api/stores/" + id + "/activate", {});
       var result = activation.body;
-      if (activation.http !== 200 || result.state !== "connected") throw new Error(result.error?.message || result.message || "Could not activate.");
+      if (activation.http !== 200 || result.state !== "connected") throw new Error(result.error?.message || result.message || "Could not connect.");
       $("cFinishNote").textContent = "";
 
       showList();
@@ -3441,10 +3415,10 @@ details summary { margin-top: 4px; }
     cState.capabilities = (s.chattrn && s.chattrn.capabilities) || {};
   }
 
-  // ---- Laravel package wizard (slice 3: Connect -> Map your tables -> Verify) ----
+  // ---- Laravel package wizard (slice 3: Connect -> Review -> Test connection) ----
   var lState = { step: 1, storeId: null, sniffed: false, pollTimer: null, registered: false, mapCards: null };
   var LSTEP_NEXT = STEP_NEXT;
-  var LSTEP_SUB = ["Composer and artisan commands", "Next", "Check it's live"];
+  var LSTEP_SUB = ["Composer and artisan commands", "Mappings and capabilities", "Read-only connection checks"];
   var LSTEP_DONE = ["Token exchanged", "Mapping saved", ""];
 
   function resetLaravelStore() { lState.progress = {}; $("lMapPanel").innerHTML = ""; lState.pendingToken = false; lState.draftValues = null; lState.storeId = null; lState.sniffed = false; lState.registered = false; lState.mapCards = null; stopLaravelPoll(); }
@@ -3470,13 +3444,12 @@ details summary { margin-top: 4px; }
   var LSTEP_TITLE = [
     ["Connect your Laravel store", "One-time — exchanges your setup token for an ongoing access token. Chattrn calls your package from its servers; nothing in your store changes."],
     ["Review your store mapping", "Fields are pre-filled with best guesses from your app's actual tables. Fix anything wrong — changes save straight to the database, no redeploy needed."],
-    ["Verify your connection", "Chattrn checks real responses through your saved mapping without changing live orders."],
-    ["Activate your connection", "Review delivery settings and activate the verified connection."],
+    ["Test your connection", "Chattrn checks real responses through your saved mapping without changing live orders."],
   ];
 
   function lShowStep(n) {
     lState.progress = lState.progress || {};
-    lState.step = Math.max(1, Math.min(4, n, ChattrnSetup.unlocked(lState.progress)));
+    lState.step = Math.max(1, Math.min(3, n, ChattrnSetup.unlocked(lState.progress)));
 
     document.querySelectorAll("[data-lpanel]").forEach(function (p) {
       p.hidden = Number(p.getAttribute("data-lpanel")) !== lState.step;
@@ -3495,7 +3468,6 @@ details summary { margin-top: 4px; }
     }
     if (lState.step === 2) loadLaravelTables();
     if (lState.step === 3) runLaravelVerify();
-    if (lState.step === 4) $("lActivationSummary").textContent = "Delivery mode: " + $("lStoreType").value + ". Review complete; activate to finish.";
   }
   document.querySelectorAll(".lstep").forEach(function (b) {
     b.addEventListener("click", function () { if (Number(b.getAttribute("data-lstep")) <= lState.step) lShowStep(Number(b.getAttribute("data-lstep"))); });
@@ -3867,7 +3839,7 @@ details summary { margin-top: 4px; }
     return res.body;
   }
 
-  // ---- STEP 3: Verify ----
+  // ---- STEP 3: Test connection ----
 
   function lVerifyRowHtml(c, withBadge) {
     var st = c.state === "passed" || c.state === "pass" ? "pass"
@@ -3951,13 +3923,13 @@ details summary { margin-top: 4px; }
       ChattrnSetup.render(document.querySelectorAll(".lstep"), lState.step, lState.progress);
       var banner = '<div class="banner ' + (verificationPassed ? 'ok' : '') + '">' +
         '<span class="ico ico-pass big">&#10003;</span>' +
-        '<div class="banner-body"><strong>' + (verificationPassed ? 'Connection verified' : 'Paired — verification needs attention') + '</strong>' +
+        '<div class="banner-body"><strong>' + (verificationPassed ? 'Connection test passed' : 'Paired — connection test needs attention') + '</strong>' +
         '<span class="hint" style="margin:0">chattrn/connector v' + esc($("lPackageVer").value.replace(/^.*v/, "") || "?") + ' on your Laravel app</span></div>' +
         '<span class="hint" style="margin:0">Checked just now</span>' +
         '<button type="button" class="primary" id="lRerun" style="background:#1c8274">Run test again</button></div>';
 
       var testCard = '<div class="card"><div class="card-title-wrap"><div class="sec-title">Test results</div>' +
-        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (advertised ? " · " + advertised + " pending verification" : "") + "</p></div>" +
+        '<p class="hint" style="margin-top:4px">' + passed + " passed" + (attention ? " · " + attention + " needs attention" : "") + (failed ? " · " + failed + " failed" : "") + (advertised ? " · " + advertised + " pending test" : "") + "</p></div>" +
         checks.map(function (c) { return lVerifyRowHtml(c, true); }).join("") + "</div>";
 
       var dqCard = '<div class="card"><div class="card-head"><div><div class="sec-title">Data quality</div>' +
@@ -4021,8 +3993,7 @@ details summary { margin-top: 4px; }
       }
       return;
     }
-    if (lState.step === 3) { if (lState.progress.verified) lShowStep(4); return; }
-    await finishLaravelConnection();
+    if (lState.step === 3) { if (lState.progress.verified) await finishLaravelConnection(); return; }
   });
 
   async function finishLaravelConnection() {
@@ -4035,12 +4006,12 @@ details summary { margin-top: 4px; }
       await saveDeliverySettings(id, {
         mode: $("lStoreType").value,
         ask_area_when: "when_needed",
-        remember_area: $("lRemember").checked,
+        remember_area: $("lRemember") ? $("lRemember").checked : true,
       });
       var res = await backend("GET", "/api/stores/" + id + "/laravel/install-status");
       if (res.http !== 200 || !res.body.can_continue) throw new Error("The package isn't fully connected yet.");
       var check = await backend("POST", "/api/stores/" + id + "/activate", {});
-      if (check.http !== 200 || check.body.state !== "connected") throw new Error(check.body.error?.message || check.body.message || "Could not activate.");
+      if (check.http !== 200 || check.body.state !== "connected") throw new Error(check.body.error?.message || check.body.message || "Could not connect.");
       $("lFinishNote").textContent = "";
       stopLaravelPoll();
 

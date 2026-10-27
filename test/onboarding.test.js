@@ -3,11 +3,11 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const Flow=require('../public/setup-flow');
 const {configurationStamp,activationProblem}=require('../src/onboarding');
 const make=()=>({connection_type:'chattrn_api',chattrn:{base_url:'https://store.test/api',access_token_enc:'encrypted'},delivery:{mode:'outlet'},mapping:{},onboarding:{},test_runs:[]});
-test('all adapters use Connect, Review, Verify, Activate with the same prerequisites',()=>{
- assert.deepEqual(Flow.steps.map(s=>s.title),['Connect','Review','Verify','Activate']);
+test('all adapters use Connect, Review, Test connection with the same prerequisites',()=>{
+ assert.deepEqual(Flow.steps.map(s=>s.title),['Connect','Review','Test connection']);
  assert.equal(Flow.allowed(2,{}),false);assert.equal(Flow.allowed(3,{connected:true}),false);
- assert.equal(Flow.allowed(4,{connected:true,reviewed:true}),false);
- assert.equal(Flow.allowed(4,{connected:true,reviewed:true,verified:true}),true);
+ assert.equal(Flow.allowed(3,{connected:true,reviewed:true}),true);
+ assert.equal(Flow.allowed(3,{connected:true,reviewed:true,verified:true}),true);
 });
 test('activation rejects missing, failing, expired and changed verification',()=>{
  const s=make();assert.match(activationProblem(s),/Review/);
